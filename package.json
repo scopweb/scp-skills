@@ -1,0 +1,19 @@
+{
+  "name": "@scopweb/scp-skills",
+  "version": "1.0.0",
+  "description": "Agent Skills by Scopweb",
+  "keywords": ["claude", "skills", "go", "golang", "security"],
+  "homepage": "https://github.com/scopweb/scp-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scopweb/scp-skills.git"
+  },
+  "license": "MIT",
+  "skills": [
+    {
+      "name": "go-secure",
+      "path": "./go-secure",
+      "description": "Go secure development with best practices, security patterns and dependency auditing"
+    }
+  ]
+}
