@@ -1,8 +1,8 @@
 {
   "name": "@scopweb/scp-skills",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Agent Skills by Scopweb",
-  "keywords": ["claude", "skills", "go", "golang", "security"],
+  "keywords": ["claude", "skills", "go", "golang", "security", "mcp"],
   "homepage": "https://github.com/scopweb/scp-skills",
   "repository": {
     "type": "git",
@@ -14,6 +14,11 @@
       "name": "go-secure",
       "path": "./go-secure",
       "description": "Go secure development with best practices, security patterns and dependency auditing"
+    },
+    {
+      "name": "mcp-spec-reviewer",
+      "path": "./mcp-spec-reviewer",
+      "description": "Review and validate MCP servers against the official MCP specification (2025-11-25)"
     }
   ]
 }
