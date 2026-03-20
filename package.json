@@ -1,0 +1,64 @@
+{
+  "name": "@scopweb/scp-skills",
+  "version": "1.3.1",
+  "description": "Agent Skills by Scopweb",
+  "keywords": ["claude", "skills", "go", "golang", "security", "mcp", "wordpress", "dotnet", "blazor", "razor"],
+  "homepage": "https://github.com/scopweb/scp-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scopweb/scp-skills.git"
+  },
+  "license": "MIT",
+  "skills": [
+    {
+      "name": "go-secure",
+      "path": "./go-secure",
+      "description": "Go secure development with best practices, security patterns and dependency auditing"
+    },
+    {
+      "name": "mcp-spec-reviewer",
+      "path": "./mcp-spec-reviewer",
+      "description": "Review and validate MCP servers against the official MCP specification (2025-11-25). Covers lifecycle, transports, tools, resources, prompts, security, and Claude Desktop compatibility. Updated March 2026: Streamable HTTP production notes, Tasks lifecycle gaps, MCP Apps extension, governance (Linux Foundation/AAIF), next release ~June 2026."
+    },
+    {
+      "name": "wp-plugin-development",
+      "path": "./wp-plugin-development",
+      "description": "Scaffold WordPress plugins from scratch: CPTs, taxonomies, ACF Pro, admin panel, Settings API and external API integration"
+    },
+    {
+      "name": "wp-plugin-audit",
+      "path": "./wp-plugin-audit",
+      "description": "Audit existing WordPress plugins for OWASP security, modern PHP 8.x practices, PHPUnit and PHPCS compliance"
+    },
+    {
+      "name": "wp-theme-auditor",
+      "path": "./wp-theme-auditor",
+      "description": "Audit WordPress themes with focus on Divi child themes: enqueue patterns, ET hook safety, ACF Pro integration and PHP 8.x compliance"
+    },
+    {
+      "name": "wp-plugin-docs-generator",
+      "path": "./wp-plugin-docs-generator",
+      "description": "Generate professional Astro Starlight documentation sites for WordPress plugins"
+    },
+    {
+      "name": "mcp-docs-generator",
+      "path": "./mcp-docs-generator",
+      "description": "Generate professional Astro Starlight documentation sites for MCP servers with custom Typekit fonts and light theme"
+    },
+    {
+      "name": "blazor-dotnet10",
+      "path": "./blazor-Server-net10",
+      "description": "Blazor Server best practices for .NET 10 and C# 14: components, EF Core, SignalR, dependency injection, service architecture and SQL Server"
+    },
+    {
+      "name": "blazor-security-audit",
+      "path": "./blazor-security-audit",
+      "description": "Security audit and hardening checklist for Blazor Server .NET 10: authentication, authorization, SignalR circuit protection, CSP headers, OWASP compliance"
+    },
+    {
+      "name": "razor-dotnet10",
+      "path": "./razor-dotnet10",
+      "description": "Razor Pages and .NET 10 patterns with Dapper data access, dual Cookie/JWT authentication and Respuesta<T> response wrapper"
+    }
+  ]
+}

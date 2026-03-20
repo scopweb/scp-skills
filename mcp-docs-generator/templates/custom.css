@@ -1,0 +1,20 @@
+/* ===========================================
+   Custom Overrides — ONLY typography + light mode
+   
+   IMPORTANT: Do NOT override --sl-color-* variables.
+   Starlight's base theme CSS handles all colors.
+   This file ONLY adds Typekit fonts and hides the
+   dark mode toggle.
+   =========================================== */
+
+/* ---- Typekit Font Assignments ---- */
+:root {
+  --sl-font: "tondo", sans-serif;
+  --sl-font-system: "tondo-signage", sans-serif;
+  --sl-font-mono: "aesthet-nova", monospace;
+}
+
+/* ---- Hide theme toggle (light only) ---- */
+starlight-theme-select {
+  display: none;
+}

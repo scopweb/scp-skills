@@ -1,0 +1,13 @@
+---
+// src/components/Head.astro
+// Override Starlight's Head to inject Typekit fonts + force light mode
+import type { Props } from '@astrojs/starlight/props';
+import Default from '@astrojs/starlight/components/Head.astro';
+---
+<Default {...Astro.props}><slot /></Default>
+<link rel="stylesheet" href="https://use.typekit.net/mwu3psf.css" />
+<script is:inline>
+  // Force light mode — disable dark mode
+  document.documentElement.dataset.theme = 'light';
+  localStorage.setItem('starlight-theme', 'light');
+</script>

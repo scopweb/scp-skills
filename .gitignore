@@ -1,0 +1,24 @@
+# === SKILLS PRIVADOS / STACK-ESPECÍFICOS ===
+vue3-scp/
+scopweb-theme/
+address-repair/
+sql-to-model/
+copy-skill/
+goland/
+go-secure-backup-1.21/
+_simlinks/
+github-best-practices-skill/
+github-profesional/
+
+# === SKILLS EXTERNOS / NO ADAPTADOS ===
+task-planner/
+subagent-driven-development/
+
+# === ARCHIVOS DE SISTEMA ===
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# === BINARIOS / HERRAMIENTAS LOCALES ===
+SymlinkCreator.exe
+creaSimlinkEnWindows.md
