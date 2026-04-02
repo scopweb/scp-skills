@@ -65,10 +65,5 @@
       "path": "./console-dotnet10",
       "description": "Best practices for .NET 10 CLI tools and console apps: IHost setup, DI, appsettings, Serilog, secrets management, Result<T> error handling and testing patterns"
     },
-    {
-      "name": "jotajotape-docs-generator",
-      "path": "./jotajotape-docs-generator",
-      "description": "Generate professional Astro Starlight documentation sites for JotaJotaPe Blazor Server and Razor Pages projects. Black/white JJP brand, Typekit fonts, dual auth docs, Dapper patterns, component and endpoint reference."
-    }
   ]
 }
