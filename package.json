@@ -16,6 +16,11 @@
       "description": "Go secure development with best practices, security patterns and dependency auditing"
     },
     {
+      "name": "go-supply-chain",
+      "path": "./go-supply-chain",
+      "description": "Security hardening for Go module dependencies and supply chain. Detects malicious code, telemetry, obfuscated code, XOR encoding, go:linkname abuse, and suspicious network calls in Go dependencies."
+    },
+    {
       "name": "mcp-spec-reviewer",
       "path": "./mcp-spec-reviewer",
       "description": "Review and validate MCP servers against the official MCP specification (2025-11-25). Covers lifecycle, transports, tools, resources, prompts, security, and Claude Desktop compatibility. Updated March 2026: Streamable HTTP production notes, Tasks lifecycle gaps, MCP Apps extension, governance (Linux Foundation/AAIF), next release ~June 2026."
@@ -65,5 +70,10 @@
       "path": "./console-dotnet10",
       "description": "Best practices for .NET 10 CLI tools and console apps: IHost setup, DI, appsettings, Serilog, secrets management, Result<T> error handling and testing patterns"
     },
+    {
+      "name": "scopweb-theme",
+      "path": "./scopweb-theme",
+      "description": "Apply the Scopweb visual theme to Astro Starlight docs projects, including design tokens, typography, social link integration, and CSS customization"
+    }
   ]
 }
