@@ -226,15 +226,16 @@ Blazor Server runs on SignalR. Key implications:
 </div>
 ```
 
-2. **Circuit timeout**: Default 3 minutes disconnected. Configure:
+2. **Circuit timeout**: Default 3 minutes disconnected. Configure (modern .NET 8+/10 Blazor Server):
 ```csharp
-builder.Services.AddServerSideBlazor()
-    .AddCircuitOptions(options =>
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents(options =>
     {
         options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(5);
         options.JSInteropDefaultCallTimeout = TimeSpan.FromSeconds(30);
     });
 ```
+(See also `blazor-security-audit` skill for full hardening + `AddInteractiveServerRenderMode()` on the endpoint.)
 
 3. **Large payloads**: Avoid sending large data through SignalR. Stream or paginate.
 
@@ -253,28 +254,6 @@ private async Task HandleClick()
     {
         _semaphore.Release();
     }
-}
-```
-
----
-
-## Error Boundaries
-
-```razor
-<ErrorBoundary @ref="_errorBoundary">
-    <ChildContent>
-        <OrderDetail OrderId="@_selectedId" />
-    </ChildContent>
-    <ErrorContent Context="ex">
-        <div class="alert alert-danger">
-            Error loading order: @ex.Message
-            <button @onclick="() => _errorBoundary?.Recover()">Retry</button>
-        </div>
-    </ErrorContent>
-</ErrorBoundary>
-
-@code {
-    private ErrorBoundary? _errorBoundary;
 }
 ```
 
@@ -321,3 +300,117 @@ For multi-language support (es, ca, en, fr):
 ```
 
 Resource files: `Resources/Components/Pages/OrderDetail.es.resx`, `.ca.resx`, `.en.resx`, `.fr.resx`
+
+---
+
+## ErrorBoundary
+
+`<ErrorBoundary>` catches unhandled exceptions in its child render tree and renders a fallback. Without it, an exception in any component tears down the entire app and shows the yellow "An unhandled exception has occurred" page.
+
+```razor
+<ErrorBoundary @ref="_boundary">
+    <ChildContent>
+        <ComponentThatMightThrow />
+    </ChildContent>
+    <ErrorContent>
+        <div class="alert alert-danger">
+            <h4>Algo ha fallado</h4>
+            <p>@context.Message</p>
+            <button class="btn btn-sm btn-secondary"
+                    @onclick="() => _boundary.Recover()">
+                Reintentar
+            </button>
+        </div>
+    </ErrorContent>
+</ErrorBoundary>
+
+@code {
+    private ErrorBoundary _boundary = default!;
+}
+```
+
+### App-level boundary (in `App.razor` or `Routes.razor`)
+
+```razor
+<ErrorBoundary>
+    <ChildContent>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+            </Found>
+        </Router>
+    </ChildContent>
+    <ErrorContent Context="ex">
+        <p class="text-danger">App error: @ex.Message</p>
+    </ErrorContent>
+</ErrorBoundary>
+```
+
+### Recover vs Reset
+
+- `ErrorBoundary.Recover()` — clears the error and re-renders the children
+- Useful pattern: a "retry" button that re-runs the failed operation after fixing input
+
+```razor
+@code {
+    private async Task Retry()
+    {
+        _boundary.Recover();
+        await LoadAsync();  // re-run the load that failed
+    }
+}
+```
+
+### Limits
+
+- **Does not** catch exceptions in event handlers (`@onclick`); wrap those in try/catch
+- **Does not** catch exceptions in lifecycle methods outside the rendering phase
+- Logs to `ILogger` automatically — add your own logging in the catch block if you need domain-specific context
+
+---
+
+## Streaming Rendering (`[StreamRendering]`)
+
+`[StreamRendering]` (the default for `InteractiveServer` in .NET 8+) lets a component render **once immediately** with a placeholder, then re-render when async data finishes. The browser sees the HTML right away and updates it in place.
+
+```razor
+@page "/dashboard"
+@attribute [StreamRendering]
+
+@if (_stats is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <h1>@_stats.TotalOrders pedidos</h1>
+    <DashboardGrid Stats="_stats" />
+}
+
+@code {
+    private DashboardStats? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // First render happens with _stats = null → placeholder
+        _stats = await DashboardService.LoadAsync();
+        // Second render with the data
+    }
+}
+```
+
+### Behavior
+
+- HTML is flushed with the placeholder state during prerender / initial render
+- Once the awaited task completes, a delta render is sent (via SignalR for `InteractiveServer`)
+- Users see a skeleton / spinner / placeholder immediately, then content
+
+### When to disable
+
+Add `[StreamRendering(disabled: true)]` when the whole component **must** wait for the data (avoids the placeholder flash).
+
+```razor
+@attribute [StreamRendering(disabled: true)]
+```
+
+For data that should not be re-fetched on the prerender → interactive handoff, combine with `PersistentComponentState` (see [persistent-state.md](persistent-state.md)).

@@ -211,6 +211,140 @@ if (order is null)
 
 ---
 
+## Dapper Anti-Patterns
+
+See [dapper-data.md](dapper-data.md) for the full Dapper guide. Key gotchas in Blazor Server:
+
+### ❌ Sync Dapper Calls
+
+```csharp
+// ❌ WRONG — blocks the circuit thread, freezes the UI
+public Order? GetOrder(int id)
+{
+    using var conn = new SqlConnection(_connString);
+    conn.Open();
+    return conn.QueryFirstOrDefault<Order>(
+        "SELECT * FROM Orders WHERE Id = @Id", new { id });
+}
+```
+
+```csharp
+// ✅ FIX — always *Async + CommandDefinition
+public async Task<Order?> GetOrderAsync(int id, CancellationToken ct = default)
+{
+    await using var conn = await connectionFactory.CreateConnectionAsync(ct);
+    return await conn.QueryFirstOrDefaultAsync<Order>(new CommandDefinition(
+        "SELECT * FROM Orders WHERE Id = @Id",
+        new { id },
+        cancellationToken: ct));
+}
+```
+
+### ❌ Connection Held for Circuit Lifetime
+
+```csharp
+// ❌ WRONG — SqlConnection lives for the whole circuit, exhausts the pool
+public class OrderService
+{
+    private readonly SqlConnection _conn;
+    public OrderService(IConfiguration cfg)
+    {
+        _conn = new SqlConnection(cfg.GetConnectionString("Default"));
+        _conn.Open();
+    }
+}
+```
+
+```csharp
+// ✅ FIX — short-lived connection per operation
+public sealed class OrderService(IDbConnectionFactory<SqlConnection> factory)
+{
+    public async Task<Order?> GetByIdAsync(int id, CancellationToken ct = default)
+    {
+        await using var conn = await factory.CreateConnectionAsync(ct);
+        return await conn.QueryFirstOrDefaultAsync<Order>(/* ... */);
+    }
+}
+```
+
+### ❌ Returning Lazy `IEnumerable<T>` from the Service
+
+```csharp
+// ❌ WRONG — connection is disposed when method returns, enumeration throws
+public async Task<IEnumerable<Order>> GetActiveAsync()
+{
+    await using var conn = await factory.CreateConnectionAsync();
+    return conn.QueryAsync<Order>(sql); // un-materialized
+}
+```
+
+```csharp
+// ✅ FIX — materialize at the service boundary
+public async Task<IReadOnlyList<Order>> GetActiveAsync(CancellationToken ct = default)
+{
+    await using var conn = await factory.CreateConnectionAsync(ct);
+    var rows = await conn.QueryAsync<Order>(new CommandDefinition(sql, cancellationToken: ct));
+    return rows.AsList();
+}
+```
+
+### ❌ Forgetting `transaction: tx`
+
+```csharp
+// ❌ WRONG — second call runs OUTSIDE the transaction
+await using var tx = await conn.BeginTransactionAsync(ct);
+await conn.ExecuteAsync(updateSql, params, transaction: tx);
+await conn.ExecuteAsync(historySql, params); // no tx → not atomic!
+```
+
+```csharp
+// ✅ FIX — pass `transaction: tx` to every call
+await conn.ExecuteAsync(new CommandDefinition(updateSql, params, transaction: tx, cancellationToken: ct));
+await conn.ExecuteAsync(new CommandDefinition(historySql, params, transaction: tx, cancellationToken: ct));
+```
+
+### ❌ Raw SQL in Components
+
+```razor
+@* ❌ WRONG — Razor component reaches into the DB directly *@
+@code {
+    private async Task LoadAsync()
+    {
+        using var conn = new SqlConnection(...);
+        _orders = (await conn.QueryAsync<Order>("SELECT ...")).ToList();
+    }
+}
+```
+
+```razor
+@* ✅ FIX — call a service *@
+@inject IOrderQueryService Orders
+
+@code {
+    private async Task LoadAsync()
+    {
+        _orders = await Orders.GetActiveAsync();
+    }
+}
+```
+
+### ❌ `SELECT *` with Dapper
+
+```csharp
+// ❌ WRONG — Dapper maps every column; later schema changes break the read
+var order = await conn.QueryFirstOrDefaultAsync<Order>(
+    "SELECT * FROM dbo.Orders WHERE Id = @Id", new { id });
+```
+
+```csharp
+// ✅ FIX — project only the columns you need
+var order = await conn.QueryFirstOrDefaultAsync<Order>(
+    """SELECT Id, Code, Amount, Status, Created FROM dbo.Orders WHERE Id = @Id""",
+    new { id });
+```
+
+---
+
 ## Async Anti-Patterns
 
 ### ❌ Blocking on Async

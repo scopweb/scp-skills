@@ -53,7 +53,7 @@
     {
       "name": "blazor-dotnet10",
       "path": "./blazor-Server-net10",
-      "description": "Blazor Server best practices for .NET 10 and C# 14: components, EF Core, SignalR, dependency injection, service architecture and SQL Server"
+      "description": "Blazor Server best practices for .NET 10.0.8 (SDK 10.0.300) and C# 14: components, EF Core, Dapper, QuickGrid, SignalR, HybridCache, auth, resilience, health checks and SQL Server"
     },
     {
       "name": "blazor-security-audit",
