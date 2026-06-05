@@ -7,7 +7,7 @@ description: >
   cubre el modelo de circuito Blazor Server, no HTTP request/response.
   Triggers: componentes Blazor, @code, EditForm, StateHasChanged, IDbContextFactory, DbContext,
   inyección de dependencias en Blazor, ciclo de vida de componentes, SignalR, FILESTREAM,
-  SQL Server, Result<T>, Extct.DTO, revisar async en Blazor, diseñar servicios .NET 10.
+  SQL Server, Result of T (Extct.DTO), revisar async en Blazor, diseñar servicios .NET 10.
 license: MIT
 ---
 

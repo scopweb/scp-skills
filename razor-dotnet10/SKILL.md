@@ -5,7 +5,7 @@ description: >
   C# 14, SQL Server, and Dapper. Use this skill for Razor Pages (.cshtml), MVC Controllers,
   API Controllers, authentication (Cookie/Identity + JWT Bearer), minimal middleware pipelines,
   and Dapper data access. Triggers on: Razor Pages, PageModel, @page, MVC controller, IActionResult,
-  ActionResult<T>, API endpoint, JWT, cookie auth, Identity, AddAuthentication, AddAuthorization,
+  ActionResult of T, API endpoint, JWT, cookie auth, Identity, AddAuthentication, AddAuthorization,
   MapControllers, RouteAttribute, ViewData, TempData, ModelState, anti-forgery, Dapper query,
   SqlConnection, Program.cs middleware, or any ASP.NET Core MVC/API pattern.
   Different from blazor-dotnet10 — this skill covers HTTP request/response model, not Blazor circuits.
