@@ -3,10 +3,12 @@ name: wp-plugin-development
 description: >
   Crear plugins WordPress desde cero con scaffolding completo.
   Usar cuando: crear un plugin nuevo, generar estructura base de plugin WordPress,
-  scaffolding de plugin con CPTs, taxonomías, ACF, admin panel, integración con APIs externas,
-  o plugin de funcionalidades para tema. Sin Composer — estructura PHP estándar WordPress.
-  Triggers: "crea un plugin", "nuevo plugin WordPress", "plugin desde cero", "scaffolding plugin WP",
-  "plugin con CPT", "plugin con ACF", "plugin con admin", "plugin con API", "plugin para mi tema".
+  scaffolding de plugin con CPTs, taxonomías, block templates, ACF, admin panel,
+  WP_CLI commands, dbDelta migrations, integración con APIs externas,
+  o plugin de funcionalidades para tema. Sin Composer (structura simple) o con PSR-4/Composer
+  según complejidad. Triggers: "crea un plugin", "nuevo plugin WordPress", "plugin desde cero",
+  "scaffolding plugin WP", "plugin con CPT", "plugin con ACF", "plugin con admin",
+  "plugin con API", "plugin para mi tema", "plugin con migrations", "plugin con WP_CLI".
   Complementa wp-plugin-audit (que cubre revisión/seguridad del código ya existente).
 license: MIT
 ---
@@ -21,10 +23,12 @@ Sin Composer. PHP estándar WordPress. Compatible con PHP 8.x y WP 6.x.
 | Archivo | Cuándo leer |
 |---------|-------------|
 | [scaffold-structure.md](references/scaffold-structure.md) | Siempre — estructura base y main file |
-| [cpt-taxonomy.md](references/cpt-taxonomy.md) | Plugin con CPTs o taxonomías propias |
+| [cpt-taxonomy.md](references/cpt-taxonomy.md) | Plugin con CPTs, taxonomías o block templates |
 | [acf-integration.md](references/acf-integration.md) | Plugin que usa Advanced Custom Fields |
 | [admin-panel.md](references/admin-panel.md) | Plugin con admin panel / settings page |
 | [api-integration.md](references/api-integration.md) | Plugin que consume APIs externas |
+| [wp-cli.md](references/wp-cli.md) | Plugin que necesita comandos WP_CLI |
+| [migrations.md](references/migrations.md) | Plugin con tablas custom y versionado de schema |
 
 **Regla:** Lee `scaffold-structure.md` siempre primero. Luego los específicos según el tipo de plugin solicitado.
 
@@ -138,4 +142,9 @@ add_action('plugins_loaded', 'mpc_init');
 □ Nonces en formularios de admin
 □ Capability checks antes de guardar opciones
 □ sanitize_*() al guardar, esc_*() al mostrar
+□ uninstall.php creado para cleanup completo
+□ Decisión clara: scaffold simple (sin Composer) vs PSR-4/Composer
+□ Block templates en CPT si es Gutenberg-first
+□ WP_CLI commands si hay tareas de mantenimiento
+□ dbDelta migrations si hay tablas custom
 ```

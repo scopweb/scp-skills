@@ -91,6 +91,8 @@ public class ProductsController : ControllerBase { }
 
 ## Authentication
 
+> Cookies, antiforgery and TempData depend on **Data Protection** — run on **.NET 10.0.9+** (CVE-2026-40372 broke the HMAC in 10.0.0–10.0.6).
+
 ```csharp
 // ❌ Hardcoding JWT secret
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-secret-key"));
@@ -124,8 +126,9 @@ return LocalRedirect(returnUrl ?? "/");
 // ❌ Storing JWT in localStorage (XSS vulnerable)
 // JavaScript: localStorage.setItem('token', token)
 
-// ✅ Use HttpOnly cookies or sessionStorage with short lifetime
-// For API clients that can't use cookies, accept the tradeoff but document it
+// ✅ Prefer HttpOnly Secure cookies (sessionStorage is just as XSS-readable)
+// If a token must live in JS (SPA without BFF), keep it short-lived (minutes),
+// rotate via refresh token, and document the accepted risk
 ```
 
 ## Dapper
@@ -223,4 +226,67 @@ CreatedAt = DateTime.Now; // local timezone, inconsistent across servers
 
 // ✅ UTC everywhere, convert to local only for display
 CreatedAt = DateTime.UtcNow;
+```
+
+## Pipeline & Errors (.NET 10)
+
+```csharp
+// ❌ UseStaticFiles() in .NET 10 — bundles no están fingerprinted, no hay Brotli auto
+app.UseStaticFiles();
+
+// ✅ MapStaticAssets() activa el pipeline fingerprint + precompression
+app.MapStaticAssets();
+
+
+// ❌ Custom JSON shape in cada controller para errores de validación
+if (!ModelState.IsValid) return BadRequest(new { error = "..." });
+
+// ✅ AddProblemDetails() central + dejar que [ApiController] lo use
+builder.Services.AddProblemDetails();
+
+
+// ❌ UseExceptionHandler con lambda gigante — pierde orden de handlers
+app.UseExceptionHandler(async ctx => { /* 80 líneas */ });
+
+// ✅ Múltiples IExceptionHandler — el primer TryHandleAsync=true gana
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddExceptionHandler<DbExceptionHandler>();
+app.UseExceptionHandler();
+
+
+// ❌ Re-throw desde controller cuando deberías devolver tipo de error del dominio
+[HttpGet("{id:int}")]
+public async Task<IActionResult> Get(int id)
+    => throw new NotFoundException("Product not found"); // 500
+
+// ✅ Devolver 404 tipado desde el servicio (Result<T>) — ver patrón Extct.DTO
+return Result<ProductDto>.Failure("Product not found");
+```
+
+> Unhandled/leaky error handling is **OWASP Top 10:2025 A10 — Mishandling of Exceptional Conditions**.
+
+## Throttling & Output Cache
+
+```csharp
+// ❌ Throttling casero con DB manual — error-prone, race conditions
+if (await _rateLimitRepo.IncrementAndCheck(key, limit))
+    return StatusCode(429);
+
+// ✅ Middleware nativo en .NET 10
+builder.Services.AddRateLimiter(o => o.AddFixedWindowLimiter("api", ...));
+app.UseRateLimiter();
+app.MapControllers().RequireRateLimiting("api");
+
+
+// ❌ Recomputar el mismo detalle en cada GET
+[HttpGet("{id:int}")]
+public async Task<IActionResult> Get(int id)
+{
+    var p = await _db.QueryFirstOrDefaultAsync<ProductDto>(/* heavy query */);
+    return Ok(p);
+}
+
+// ✅ Output cache .NET 10
+app.UseOutputCache();
+app.MapGet("/api/products/{id:int}", ...).CacheOutput("ProductDetail");
 ```

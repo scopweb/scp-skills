@@ -75,6 +75,10 @@ Sampling allows servers to request LLM completions through the client. This enab
 }
 ```
 
+### Tool Calling in Sampling (New in 2025-11-25)
+
+Sampling requests may include `tools` and `toolChoice` parameters, allowing the LLM to use tools during sampling. This enables more complex agentic behaviors where the server can request tool-augmented completions.
+
 ### Security Controls
 
 Users MUST explicitly approve sampling requests. Users should control:

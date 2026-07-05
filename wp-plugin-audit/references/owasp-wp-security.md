@@ -259,3 +259,91 @@ $api_key = get_option('my_plugin_api_key');
 $masked = str_repeat('*', max(0, strlen($api_key) - 4)) . substr($api_key, -4);
 echo '<input type="password" value="' . esc_attr($api_key) . '" name="my_plugin_api_key">';
 ```
+
+---
+
+## 9. Block Bindings API (WP 6.5+)
+
+Permite bindear valores de meta fields directamente a bloques Gutenberg sin usar `update_post_meta` directamente.
+
+### Registrar un binding en block.json
+
+```json
+{
+    "name": "my-plugin/product-price",
+    "attributes": {
+        "price": {
+            "type": "number",
+            "source": "binding",
+            "binding": {
+                "price": {
+                    "type": "string",
+                    "source": "meta",
+                    "meta": "_my_product_price"
+                }
+            }
+        }
+    }
+}
+```
+
+### Seguridad del binding
+
+```php
+// El meta field debe estar registrado con show_in_rest => true
+register_post_meta('mpc_producto', '_my_product_price', [
+    'type'              => 'number',
+    'single'            => true,
+    'show_in_rest'      => true,
+    'sanitize_callback' => function($value) {
+        return floatval($value);
+    },
+]);
+
+// Verificar capability en el binding callback
+function my_plugin_binding_callback($meta, $post, $attr) {
+    if (!current_user_can('edit_post', $post->ID)) {
+        return null;
+    }
+    return $meta[$attr['meta']] ?? null;
+}
+add_filter('block_bindings_callback', 'my_plugin_binding_callback', 10, 3);
+```
+
+---
+
+## 10. Interception API (WP 6.5+)
+
+`wp_set_interception` permite interceptar operaciones de la WP Filesystem API para sanitizar uploads.
+
+### Patrón de validación de upload
+
+```php
+// En el handler de upload
+add_filter('wp_check_filetype_and_ext', function($types, $file, $filename, $mimes) {
+    // Validar tipo MIME real
+    $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!in_array($types['type'], $allowed, true)) {
+        return ['ext' => '', 'type' => '', 'proper_filename' => ''];
+    }
+    return $types;
+}, 10, 4);
+
+// Verificar capability antes de cualquier operación de filesystem
+if (!current_user_can('upload_files')) {
+    wp_send_json_error('Forbidden', 403);
+}
+```
+
+---
+
+## 11. Checklist WP 6.4+ Security
+
+```
+□ Meta fields con show_in_rest => true si se usan en bindings
+□ Block bindings con permission_callback verificado
+□ wp_set_interception para operaciones filesystem custom
+□ register_post_type/show_in_rest para CPTs accesibles via API
+□ REST endpoints usan WP_REST_Server::READABLE/EDITABLE constantes
+□ wp_enqueue_global_styles_css() no expone datos sensibles
+```

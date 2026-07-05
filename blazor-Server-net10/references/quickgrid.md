@@ -259,7 +259,7 @@ protected override void OnInitialized()
 
 ### Row Styling (`RowClass`, .NET 10)
 
-`RowClass` (added in .NET 10) takes a function that returns a CSS class for each row. Combine with `<RowClass>` to highlight status, overdue rows, or per-user permissions:
+`RowClass` (added in .NET 10) takes a function that returns a CSS class — or `null` for the default — for each row. Use it to highlight status, overdue rows, or per-user permissions:
 
 ```razor
 <QuickGrid Items="@_orders"

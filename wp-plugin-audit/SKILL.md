@@ -4,9 +4,10 @@ description: >
   Auditoría de seguridad, PHP moderno y testing para plugins WordPress privados/cliente.
   Usar cuando: revisar o auditar un plugin existente, detectar vulnerabilidades de seguridad
   en plugins WordPress, aplicar patrones PHP 8.x modernos (namespaces, PSR-4, Composer),
-  configurar PHPUnit o PHPCS en plugins, auditar CPTs o taxonomías personalizadas,
+  configurar PHPUnit, PHPStan o PHPCS en plugins, auditar CPTs o taxonomías personalizadas,
   revisar nonces/capabilities/sanitización/escaping, detectar SQL injection o XSS en plugins,
-  validar seguridad OWASP en código WordPress. También usar cuando el usuario diga
+  validar seguridad OWASP en código WordPress, auditar Block Bindings API e Interception API
+  (WP 6.5+). También usar cuando el usuario diga
   "revisa mi plugin", "audita este código WP", "es seguro este plugin", "añade tests al plugin",
   "plugin con namespace", "PHP moderno en WordPress".
   Complementa wp-plugin-development (creación) — este skill se centra en REVISIÓN y CALIDAD.
@@ -69,6 +70,8 @@ Lee el archivo relevante antes de dar recomendaciones. Para auditoría completa,
 □ Funciones de WP mockeadas correctamente (no llamadas reales)
 □ PHPCS con ruleset WordPress-Extra o WordPress-Core
 □ .phpcs.xml.dist en raíz del plugin
+□ PHPStan o Psalm configurado (nivel 5+)
+□ phpstan.neon.dist o psalm.xml en raíz
 □ CI configurado (GitHub Actions o similar)
 □ Cobertura de: activación, desactivación, casos límite de seguridad
 ```
@@ -145,4 +148,6 @@ ls -la tests/ test/ 2>/dev/null
 - Todas las acciones AJAX/form con nonce + capability check
 - Namespace declarado y autoloading funcional
 - PHPCS pasa sin errores en WordPress-Extra
+- PHPStan nivel 5+ sin errores críticos
 - Al menos tests de humo para activación y funcionalidad principal
+- Block bindings y REST endpoints con permission_callback verificado

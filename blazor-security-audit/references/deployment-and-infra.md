@@ -63,6 +63,14 @@ builder.WebHost.ConfigureKestrel(options =>
 // See IIS Hardening section below
 ```
 
+### Don't disable certificate validation
+
+```text
+❌ Server=...;TrustServerCertificate=True    // accepts ANY cert → MITM on the wire
+```
+
+`TrustServerCertificate=True` in a SQL/connection string skips TLS certificate validation, exposing the DB connection to man-in-the-middle on the internal network. Install a valid certificate on the DB server and remove the flag (or scope it to dev only).
+
 ---
 
 ## Security Headers
@@ -251,6 +259,24 @@ grep -rn "password\|secret\|apikey\|connectionstring\|sk_live\|sk_test" \
 # dotnet tool install -g gitleaks
 ```
 
+### If a secret was ever committed (git history ≠ working tree)
+
+A clean working tree is not enough — secrets live in history until it's rewritten. A real, recurring mistake: committing the very `replace_secrets.txt` / BFG rules file used to scrub the history, which re-leaks the exact value into *every* commit (including "fresh start" ones), making the cleanup useless.
+
+Order of operations when a credential leaks:
+1. **Rotate the credential first** (DB password, API key) — treat it as compromised the moment it was pushed. Purging history does not un-leak it.
+2. Then remove the file and rewrite history (BFG / `git filter-repo`), or start a genuinely new repo.
+3. Confirm the secret-scrubbing rules file itself is **not** tracked.
+4. Verify real config is git-ignored (`appsettings.json` / `appsettings.*.json`) and only a `*.demo` / `*.example` with placeholders is committed. Check this **before** flagging "secret in repo" — a placeholder-only demo file is a false alarm.
+5. Scan history, not just HEAD.
+
+```bash
+gitleaks detect --source . --log-opts="--all"          # full history, not just current tree
+git log --all --full-history -- replace_secrets.txt    # was a scrub-rules file committed?
+```
+
+> `SmtpClient` is obsolete per Microsoft (no modern TLS fixes) — prefer MailKit for outbound mail. Minor, not urgent.
+
 ---
 
 ## IIS Hardening
@@ -321,14 +347,17 @@ dotnet restore
 
 # Outdated packages (potential unpatched vulnerabilities)
 dotnet list package --outdated
+
+# Runtime y SDK parcheados — mínimos jun-2026 (OWASP A03:2025 Software Supply Chain)
+dotnet --list-runtimes   # Microsoft.AspNetCore.App >= 10.0.9 (CVE-2026-45591, CVE-2026-45491)
+dotnet --version         # SDK >= 10.0.301 (CVE-2026-45490: EoP via named pipe del SDK en Windows)
 ```
 
 ### Third-party tools
 
 ```bash
-# OWASP Dependency Check
-dotnet tool install -g dotnet-retire
-dotnet retire
+# dotnet-retire está sin mantenimiento — preferir NuGetAudit (restore) + --vulnerable
+# Escáneres adicionales: OSV-Scanner, Trivy
 
 # Snyk (if available)
 snyk test --file=MyApp.csproj
@@ -394,6 +423,11 @@ builder.Host.UseSerilog((context, config) =>
 ## Data Protection API
 
 Used for encrypting cookies, antiforgery tokens, and other protected data.
+
+> **CVE-2026-40372**: las versiones 10.0.0–10.0.6 de `Microsoft.AspNetCore.DataProtection`
+> calculan el HMAC sobre bytes incorrectos en el managed authenticated encryptor.
+> Verifica que cualquier paquete `Microsoft.AspNetCore.DataProtection*` referenciado
+> explícitamente esté fuera de ese rango (alineado con runtime 10.0.9+).
 
 ```csharp
 // Configure persistent key storage (essential for multi-server or container deployments)

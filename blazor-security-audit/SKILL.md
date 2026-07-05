@@ -17,6 +17,12 @@ description: >
 Comprehensive security checklist for Blazor Server apps on .NET 10 (LTS) with C# 14.
 Focused exclusively on **Blazor Server** (SignalR circuits, server-side rendering).
 
+**Versiones mínimas exigibles (jul-2026): runtime ≥ 10.0.9 y SDK ≥ 10.0.301** — los parches
+de junio 2026 corrigen CVE-2026-45591 (DoS en el hub protocol MessagePack de SignalR),
+CVE-2026-40372 (DataProtection), CVE-2026-45490 (EoP named pipe del SDK en Windows) y
+CVE-2026-45491 (symlink traversal en `TarFile.ExtractToDirectory`). Una versión inferior
+es hallazgo **High** por sí sola.
+
 ## Reference Files
 
 | File | When to read |
@@ -33,6 +39,11 @@ Read the relevant reference before making recommendations. For quick audit, use 
 ## Quick Audit Checklist
 
 Run through these categories when auditing a Blazor Server app. Each item links to its reference for details.
+
+Mapeo a **OWASP Top 10:2025**: §1 → A01 Broken Access Control (incluye SSRF) y A07 Authentication Failures;
+§2 → A02 Security Misconfiguration y A10 Mishandling of Exceptional Conditions; §3 → A05 Injection y A01;
+§4 → A06 Cryptographic Failures, A08 Data Integrity Failures y A09 Security Logging and Alerting Failures;
+§5 → A02 y A03 Software Supply Chain Failures (nueva en 2025).
 
 ### 1. Authentication & Authorization
 
@@ -61,6 +72,7 @@ Run through these categories when auditing a Blazor Server app. Each item links 
 □ No singleton services leaking state across circuits
 □ Rate limiting on SignalR hub endpoint
 □ HTTPS enforced on WebSocket transport
+□ Runtime ≥ 10.0.9 si hay hubs con MessagePack protocol (CVE-2026-45591, DoS por arrays anidados)
 ```
 
 ### 3. Web Vulnerabilities (XSS, CSRF, CORS)
@@ -75,6 +87,12 @@ Run through these categories when auditing a Blazor Server app. Each item links 
 □ Input validation on all user inputs (server-side)
 □ Output encoding for any dynamic content
 □ No eval() or inline scripts in JS interop
+□ File endpoints: Path.GetFileName + base-dir containment (no path traversal)
+□ Ownership checks on resource access (no IDOR via id in route/form)
+□ Upload/body size capped (FormOptions / Kestrel limits)
+□ Raw ADO.NET/Dapper: parameterized IN clauses, identifier whitelist (not only EF)
+□ Extracción de archivos subidos (TarFile/ZipFile): runtime ≥ 10.0.9 (CVE-2026-45491) + destino validado
+□ SSRF: URLs del usuario nunca consumidas server-side sin allow-list (OWASP A01:2025)
 ```
 
 ### 4. Data Protection & Secrets
@@ -87,6 +105,9 @@ Run through these categories when auditing a Blazor Server app. Each item links 
 □ PII handling complies with GDPR/local regulations
 □ Logging does NOT contain sensitive data (passwords, tokens)
 □ EF Core: parameterized queries only (no raw SQL concatenation)
+□ Paquetes Microsoft.AspNetCore.DataProtection* fuera del rango 10.0.0–10.0.6 (CVE-2026-40372)
+□ No TrustServerCertificate=True in connection strings (MITM)
+□ Git history scanned for secrets (gitleaks --all); any leaked credential rotated
 ```
 
 ### 5. Deployment & Infrastructure
@@ -101,7 +122,8 @@ Run through these categories when auditing a Blazor Server app. Each item links 
 □ IIS: request filtering, URL scan, application pool identity
 □ Rate limiting middleware configured
 □ Health check endpoints restricted
-□ Dependency audit (dotnet list package --vulnerable)
+□ Dependency audit (dotnet list package --vulnerable) — OWASP A03:2025 Software Supply Chain
+□ Runtime ≥ 10.0.9 y SDK ≥ 10.0.301 (parches jun-2026; CVE-2026-45490 exige SDK 10.0.301+)
 ```
 
 ---
@@ -121,9 +143,18 @@ When performing a security audit:
 | Severity | Examples |
 |----------|---------|
 | **Critical** | No auth on admin pages, secrets in source code, SQL injection |
-| **High** | Missing HTTPS, weak password policy, no antiforgery, singleton state leak |
+| **High** | Missing HTTPS, weak password policy, no antiforgery, singleton state leak, runtime/SDK sin parches jun-2026 (< 10.0.9 / < 10.0.301) |
 | **Medium** | Missing CSP headers, no rate limiting, verbose error messages |
 | **Low** | Missing X-Content-Type-Options, no HSTS preload, no audit logging |
+
+### Methodology rules
+
+- **A security review is read-only.** Don't commit anything; if a command dirties the tree (restore/lockfile churn, formatting, `*.sum` edits), revert it. The deliverable is the report, not a commit.
+- **Verify every finding against the real code** before assigning severity — automated/agent scans over-report. Reproduce the exploit path (or confirm the guard exists) rather than trusting the label.
+- **Build/compile as part of the audit.** A stray `using` for an unreferenced package (CS0246), or nullable warnings under `TreatWarningsAsErrors`, are real "doesn't ship" findings.
+- **History ≠ working tree** for secrets (see deployment ref); **check `.gitignore`** before flagging committed secrets.
+- **Don't trust textual/regex blacklists as a security control** — comment-stripping, encoding, and whitespace tricks bypass them. Prefer parameterization, allow-lists, and framework controls.
+- **Report format:** group by severity (🔴 Critical / 🟠 High / 🟡 Medium / 🟢 verified-OK), each with file:line, impact, and a concrete fix; end with a prioritized remediation list. Offer to implement fixes on a branch — don't auto-apply during the audit.
 
 ---
 
@@ -206,13 +237,15 @@ app.Use(async (context, next) =>
 ### Circuit Configuration
 
 ```csharp
-builder.Services.AddServerSideBlazor(options =>
-{
-    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
-    options.DisconnectedCircuitMaxRetained = 100;
-    options.MaxBufferedUnacknowledgedRenderBatches = 10;
-    options.DetailedErrors = false; // NEVER true in production
-});
+// .NET 8+ Razor Components model (AddServerSideBlazor es la API legacy)
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents(options =>
+    {
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+        options.DisconnectedCircuitMaxRetained = 100;
+        options.MaxBufferedUnacknowledgedRenderBatches = 10;
+        options.DetailedErrors = false; // NEVER true in production
+    });
 ```
 
 ### Dependency Vulnerability Check
@@ -224,9 +257,9 @@ dotnet list package --vulnerable --include-transitive
 # Audit with NuGet Audit (.NET 8+)
 dotnet restore --force  # NuGetAudit runs on restore
 
-# OWASP dependency check (optional, more thorough)
-dotnet tool install -g dotnet-retire
-dotnet retire
+# Runtime y SDK parcheados (mínimos jun-2026)
+dotnet --list-runtimes   # Microsoft.AspNetCore.App >= 10.0.9
+dotnet --version         # SDK >= 10.0.301
 ```
 
 ---
@@ -245,3 +278,14 @@ dotnet retire
 | Raw SQL: `$"SELECT * WHERE Id = {id}"` | SQL injection | Use parameterized queries |
 | No circuit limits configured | Memory exhaustion DoS | Configure CircuitOptions |
 | CORS `AllowAnyOrigin()` | Cross-origin attacks | Restrict to known origins |
+| Hub con MessagePack en runtime < 10.0.9 | DoS stack overflow (CVE-2026-45591) | Actualizar runtime a ≥ 10.0.9 |
+| `TarFile.ExtractToDirectory` sobre uploads en runtime < 10.0.9 | Symlink traversal (CVE-2026-45491) | Runtime ≥ 10.0.9 + validar rutas extraídas |
+| `IN (` + quoted, concatenated values (raw ADO.NET) | SQL injection | Parameterize: `@c0,@c1,…` typed to the column |
+| `queryTemplate.Replace("@ids", …)` | SQL injection | Never build SQL by token replacement |
+| `[{dbName}]` / identifier from config or input | SQL injection | Whitelist allowed identifiers |
+| `Path.Combine(baseDir, userInput)` / `baseDir + fileName` | Path traversal | `Path.GetFileName` + verify resolved path under base |
+| Resource fetched by id with no ownership check | IDOR | Verify current user owns the resource |
+| `TrustServerCertificate=True` | MITM on DB/TLS connection | Install valid cert; remove flag |
+| `@Html.Raw(dbValue)` / `innerHTML = dbValue` / `.html(dbValue)` | Stored XSS | Encode / `textContent` / sanitize |
+| `dict["key"]` on a possibly-missing key | KeyNotFoundException mis-handled as wrong error | `TryGetValue` + validate |
+| Destructive op runs on a `0` / failed return value | Mass data corruption | Guard `if (id > 0)` before cascading writes |

@@ -1,106 +1,106 @@
 # Claude Desktop Compatibility
 
-**Last verified**: 2025-11 (Claude Desktop ~0.10.x)
-**Scope**: Particularidades de Claude Desktop como host MCP — útil para validar si un servidor será compatible.
+**Last verified**: 2026-03 (Claude Desktop + Claude Code)
+**Scope**: Claude Desktop and Claude Code specifics as MCP hosts — useful for validating server compatibility.
 
 ---
 
-## Transport: solo stdio
+## Transport: stdio only
 
-Claude Desktop **solo soporta stdio**. No soporta Streamable HTTP ni HTTP+SSE.
+Claude Desktop **only supports stdio**. It does not support Streamable HTTP or HTTP+SSE.
 
-| Implicación | Detalle |
-|-------------|---------|
-| El servidor debe lanzarse como subprocess | Claude Desktop lo arranca con el comando configurado |
-| No sirve exponer un puerto HTTP | Claude Desktop no se conectará |
-| Servidores remotos/cloud no son compatibles directamente | Requieren un wrapper stdio local |
+| Implication | Detail |
+|-------------|--------|
+| Server must launch as subprocess | Claude Desktop starts it with the configured command |
+| Exposing an HTTP port is useless | Claude Desktop will not connect |
+| Remote/cloud servers are not directly compatible | They require a local stdio wrapper |
 
-**Validación**: Si un servidor solo implementa Streamable HTTP → ⚠️ **No compatible con Claude Desktop**.
+**Validation**: If a server only implements Streamable HTTP → **Not compatible with Claude Desktop**.
 
 ---
 
 ## Protocol Version
 
-Claude Desktop negocia versiones. Versión conocida en uso: `2025-11-25` (versiones recientes) o `2025-06-18` (versiones anteriores).
+Both Claude Desktop and Claude Code now negotiate with `protocolVersion: "2025-11-25"` (verified March 2026). Older versions used `2025-06-18`.
 
-**Patrón recomendado**: el servidor debe aceptar la `protocolVersion` que el cliente envía en `initialize` o responder con la más alta que soporte en common:
+**Recommended pattern**: the server should accept the `protocolVersion` the client sends in `initialize` or respond with the highest version it supports in common:
 
 ```json
-// Cliente envía:
+// Client sends:
 { "protocolVersion": "2025-11-25" }
 
-// Servidor responde con la misma versión (o la más alta que soporte):
+// Server responds with the same version (or the highest it supports):
 { "protocolVersion": "2025-11-25" }
 ```
 
-**Validación**: Si el servidor fija una versión sin aceptar negociación → ⚠️ **Riesgo de fallo con versiones distintas de Claude Desktop**.
+**Validation**: If the server hardcodes a version without accepting negotiation → **Risk of failure with different Claude Desktop versions**.
 
 ---
 
-## Configuración: claude_desktop_config.json
+## Configuration: claude_desktop_config.json
 
-Ubicación del archivo de configuración:
+Configuration file location:
 
-| OS | Ruta |
+| OS | Path |
 |----|------|
 | macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 
-### Estructura
+### Structure
 
 ```json
 {
   "mcpServers": {
-    "nombre-servidor": {
+    "server-name": {
       "command": "node",
-      "args": ["/ruta/al/servidor/index.js"],
+      "args": ["/path/to/server/index.js"],
       "env": {
-        "API_KEY": "valor"
+        "API_KEY": "value"
       }
     }
   }
 }
 ```
 
-Campos:
+Fields:
 
-| Campo | Requerido | Descripción |
-|-------|-----------|-------------|
-| `command` | ✅ | Ejecutable (node, python, go binary, npx…) |
-| `args` | — | Array de argumentos |
-| `env` | — | Variables de entorno adicionales |
+| Field | Required | Description |
+|-------|----------|-------------|
+| `command` | Yes | Executable (node, python, go binary, npx...) |
+| `args` | — | Array of arguments |
+| `env` | — | Additional environment variables |
 
-**Nota**: Claude Desktop hereda el PATH del sistema, pero puede diferir del shell interactivo. Usar rutas absolutas en `command`/`args` es más fiable.
-
----
-
-## Capacidades habilitadas en Claude Desktop
-
-Claude Desktop como host generalmente declara soporte para:
-
-- **Roots** (`roots.listChanged`) — puede enviar listas de raíces al servidor
-- **Sampling** — puede o no estar disponible según versión
-
-**Validación**: No asumir que el host soporta sampling si el servidor lo requiere; verificar capacidades negociadas en `initialize`.
+**Note**: Claude Desktop inherits the system PATH, but it may differ from the interactive shell. Using absolute paths in `command`/`args` is more reliable.
 
 ---
 
-## Restricciones conocidas
+## Capabilities enabled in Claude Desktop
 
-| Restricción | Impacto |
-|-------------|---------|
-| Solo stdio | Servidores HTTP no conectan |
-| Sin hot-reload de config | Hay que reiniciar Claude Desktop tras cambiar `claude_desktop_config.json` |
-| stderr visible en logs de Claude Desktop | Útil para debugging; no usar stdout para logs |
-| Timeout en initialize | Servidores lentos en arrancar pueden fallar la conexión |
+Claude Desktop as a host generally declares support for:
+
+- **Roots** (`roots.listChanged`) — can send root lists to the server
+- **Sampling** — may or may not be available depending on version
+
+**Validation**: Do not assume the host supports sampling if the server requires it; verify negotiated capabilities in `initialize`.
 
 ---
 
-## Checklist rápido: ¿Mi servidor es compatible con Claude Desktop?
+## Known Restrictions
 
-- [ ] Implementa transporte **stdio**
-- [ ] Acepta negociación de `protocolVersion` (echo del cliente o fallback gracioso)
-- [ ] No escribe contenido no-MCP en **stdout**
-- [ ] Usa **stderr** para logging
-- [ ] Arranca rápido (initialize no hace llamadas lentas síncronas)
-- [ ] No requiere capacidades del host que Claude Desktop pueda no soportar (ej: sampling)
+| Restriction | Impact |
+|-------------|--------|
+| stdio only | HTTP servers cannot connect |
+| No hot-reload of config | Must restart Claude Desktop after changing `claude_desktop_config.json` |
+| stderr visible in Claude Desktop logs | Useful for debugging; do not use stdout for logs |
+| Timeout on initialize | Slow-starting servers may fail the connection |
+
+---
+
+## Quick checklist: Is my server compatible with Claude Desktop?
+
+- [ ] Implements **stdio** transport
+- [ ] Accepts `protocolVersion` negotiation (client echo or graceful fallback)
+- [ ] Does not write non-MCP content to **stdout**
+- [ ] Uses **stderr** for logging
+- [ ] Starts quickly (initialize does not make slow synchronous calls)
+- [ ] Does not require host capabilities that Claude Desktop may not support (e.g., sampling)

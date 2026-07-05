@@ -7,13 +7,18 @@
 
 ## Tasks (Experimental — 2025-11-25)
 
-Tasks are durable state machines for tracking long-running work. Any request can be augmented with a task for polling and deferred result retrieval.
+Tasks are durable state machines for tracking long-running work. Any request can be augmented with a task for polling and deferred result retrieval. Each task is uniquely identified by a receiver-generated task ID.
 
-> ℹ️ **Estado (marzo 2026)**: Tasks está en uso en producción. El feedback real ha identificado lifecycle gaps pendientes de cierre en próxima versión de spec:
-> - **Retry semantics**: no hay semántica estándar para reintentar tareas con fallo transitorio
-> - **Expiry policies**: no hay política estándar de cuánto tiempo retiene el servidor resultados tras completar
+> ℹ️ **Status (March 2026)**: Tasks is in use in production. Real-world feedback has identified lifecycle gaps pending closure in the next spec version:
+> - **Retry semantics**: no standard semantics for retrying tasks with transient failures
+> - **Expiry policies**: no standard policy for how long the server retains results after completion
 >
-> Tenerlo en cuenta: implementaciones actuales deben definir estas políticas a nivel de aplicación.
+> Keep in mind: current implementations must define these policies at the application level.
+
+### Definitions
+
+- **Requestor**: sender of a task-augmented request (can be client or server)
+- **Receiver**: receiver/executor of a task-augmented request (can be client or server)
 
 ### Capability
 
@@ -35,34 +40,96 @@ Client:
 {
   "capabilities": {
     "tasks": {
+      "list": {},
+      "cancel": {},
       "requests": {
-        "elicitation": { "create": {} },
-        "sampling": { "createMessage": {} }
+        "sampling": { "createMessage": {} },
+        "elicitation": { "create": {} }
       }
     }
   }
 }
 ```
 
+### Tool-Level Task Negotiation
+
+Tools declare task support via `execution.taskSupport` in `tools/list` results:
+
+| Value | Meaning |
+|-------|---------|
+| `"forbidden"` (default) | Clients MUST NOT invoke as task |
+| `"optional"` | Clients MAY invoke as task or normal request |
+| `"required"` | Clients MUST invoke as task; server MUST return `-32601` otherwise |
+
+This only applies if server capabilities include `tasks.requests.tools.call`. If not, clients MUST NOT use task augmentation regardless of `execution.taskSupport`.
+
 ### Task Status Lifecycle
 
 ```
-created → working → completed
-                  → failed
-                  → cancelled
-         → input_required → working (after user input)
+[*] --> working
+working --> input_required
+working --> completed / failed / cancelled
+input_required --> working
+input_required --> completed / failed / cancelled
 ```
 
-> ⚠️ **Gap conocido**: no hay estado `retrying` ni semántica de reintento en spec 2025-11-25. Implementar a nivel de aplicación si se necesita.
+- Tasks **MUST** begin in `working` status
+- `completed`, `failed`, `cancelled` are **terminal** — MUST NOT transition further
+- `input_required`: receiver needs input from requestor; requestor SHOULD call `tasks/result`
+
+> ⚠️ **Known gap**: there is no `retrying` state or retry semantics in spec 2025-11-25. Implement at the application level if needed.
 
 ### Protocol Messages
 
-- Request con `_meta.task.create: true` — crear tarea asociada al request
-- `tasks/get` — polling de estado
-- `tasks/result` — recuperar resultado completado
-- `tasks/list` — listar tareas conocidas
-- `tasks/cancel` — cancelar tarea en curso
-- `notifications/tasks/status_changed` — servidor notifica cambio de estado
+#### Creating Tasks
+
+Requestors include a `task` field in request params (NOT `_meta`):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_weather",
+    "arguments": { "city": "New York" },
+    "task": { "ttl": 60000 }
+  }
+}
+```
+
+Response is a `CreateTaskResult` (NOT the tool result):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "task": {
+      "taskId": "786512e2-...",
+      "status": "working",
+      "statusMessage": "The operation is now in progress.",
+      "createdAt": "2025-11-25T10:30:00Z",
+      "lastUpdatedAt": "2025-11-25T10:40:00Z",
+      "ttl": 60000,
+      "pollInterval": 5000
+    }
+  }
+}
+```
+
+#### Polling Status
+
+- `tasks/get` — poll status by taskId
+- `tasks/result` — retrieve completed result (blocks until terminal status if not yet terminal)
+- `tasks/list` — list known tasks (paginated)
+- `tasks/cancel` — cancel in-progress task
+
+#### Status Notifications
+
+- `notifications/tasks/status` — receiver MAY send when task status changes
+- Requestors **MUST NOT** rely on receiving this notification — it is optional
+- Requestors **SHOULD** continue to poll via `tasks/get`
 
 ### Key Fields
 
@@ -78,22 +145,47 @@ created → working → completed
 }
 ```
 
-- `ttl`: time-to-live en ms (cuánto retiene el servidor los datos de la tarea)
-- `pollInterval`: intervalo de polling sugerido en ms
-- Requestors SHOULD respetar `pollInterval`
-- Requestors SHOULD continuar polling hasta estado terminal
+- `taskId`: string, unique among all receiver tasks, generated by receiver
+- `ttl`: time-to-live in ms from creation (receiver MAY override requested value)
+- `pollInterval`: suggested polling interval in ms
+- `createdAt` / `lastUpdatedAt`: ISO 8601 timestamps — receiver MUST include in all task responses
 
-> ⚠️ **Gap conocido**: el `ttl` es un hint del servidor pero no hay política de expiración normalizada. Implementar garbage collection explícito si el servidor acumula tareas completadas.
+> ⚠️ **Known gap**: `ttl` is a server hint but there is no standardized expiry policy. Implement explicit garbage collection if the server accumulates completed tasks.
+
+### Related Task Metadata
+
+All requests, responses, and notifications related to a task **MUST** include:
+```json
+{
+  "_meta": {
+    "io.modelcontextprotocol/related-task": {
+      "taskId": "786512e2-..."
+    }
+  }
+}
+```
+
+Exception: `tasks/get`, `tasks/list`, `tasks/cancel` — SHOULD NOT include this metadata (taskId already in params/response).
 
 ### Task Rules
 
 | Rule | Level |
 |------|-------|
-| Task IDs MUST be unique within session | MUST |
-| Receivers MUST generate task IDs | MUST |
-| Receivers MUST NOT create tasks unless requestor includes `_meta.task.create` | MUST |
-| Task access MUST be restricted to creating session | MUST |
-| `tasks/result` returns what the original request would have returned | MUST |
+| Task IDs MUST be strings | MUST |
+| Task IDs MUST be generated by the receiver | MUST |
+| Task IDs MUST be unique among all tasks controlled by the receiver | MUST |
+| Tasks MUST begin in `working` status | MUST |
+| Terminal statuses MUST NOT transition to any other status | MUST |
+| When authorization context exists, receivers MUST bind tasks to that context | MUST |
+| Receivers MUST include `createdAt` and `lastUpdatedAt` in all task responses | MUST |
+| `tasks/result` for terminal task MUST return what original request would have returned | MUST |
+| `tasks/result` for non-terminal task MUST block until terminal status | MUST |
+| Receivers MUST reject cancel for tasks already terminal (error `-32602`) | MUST |
+| Requestors SHOULD respect `pollInterval` | SHOULD |
+| Requestors SHOULD continue polling until terminal status | SHOULD |
+| Requestors MUST NOT rely on `notifications/tasks/status` | MUST |
+| If context-binding unavailable, receivers MUST generate cryptographically secure task IDs | MUST |
+| Receivers without requestor identification SHOULD NOT declare `tasks.list` capability | SHOULD |
 
 ---
 
@@ -238,7 +330,7 @@ Reference types: `ref/prompt`, `ref/resource`
 
 ## Pagination
 
-List operations (tools/list, resources/list, prompts/list) support cursor-based pagination.
+List operations (tools/list, resources/list, prompts/list, tasks/list) support cursor-based pagination.
 
 - Request includes optional `cursor` parameter
 - Response includes `nextCursor` if more results exist

@@ -173,12 +173,82 @@ if request.get("method") == "initialize":
 | Version | Client |
 |---------|--------|
 | `2024-11-05` | MCP spec v1.0 (safe fallback) |
-| `2025-06-18` | Claude Desktop (current) |
-| `2025-11-25` | Latest MCP spec |
+| `2025-06-18` | Claude Desktop / Claude Code (legacy — pre-2026) |
+| `2025-11-25` | Claude Desktop + Claude Code (current, since early 2026) |
+
+> ℹ️ **Verified (March 2026)**: Both Claude Desktop and Claude Code now send `protocolVersion: "2025-11-25"` in their `initialize` requests. Servers that only support older versions must negotiate down correctly or risk hanging (see Stripe MCP issue #290).
 
 ### Why This Works
 
 Per the spec: *"If server supports it → MUST respond with same version"*. By echoing the client's version, you implicitly declare support for all versions, ensuring compatibility without recompilation.
+
+---
+
+## Server Instructions (`instructions` field)
+
+The `InitializeResult` includes an optional `instructions` field (string) that the server sends to the client during the handshake. This is the **only mechanism guaranteed to inject context into the AI model at every session start**, regardless of client configuration.
+
+### Why this matters
+
+**Problem**: AI clients (Claude Desktop, Claude Code, etc.) receive the tool list via `tools/list`, but the model may not explore all available tools — it discovers only the ones it considers relevant at that moment. This leads to the model ignoring powerful tools (e.g., using `write_file` for edits instead of `edit_file`, or never discovering `batch_operations`).
+
+**Solution**: Use `instructions` to tell the model what tools exist, when to use each one, and critical usage rules. The client receives this during `initialize` — before any user interaction — so the model has full context from the start.
+
+### What to include in instructions
+
+1. **Tool catalog** — list every tool with a one-line description
+2. **Usage rules** — e.g., "use `edit_file` for modifications, never `write_file`"
+3. **Workflow patterns** — e.g., "use `read_file` with `outline=true` first, then `start_line/end_line` for sections"
+4. **Grouping** — organize tools by category (read, write, search, bulk)
+
+### Go implementation (mcp-go SDK)
+
+```go
+s := server.NewMCPServer(
+    "my-server",
+    "1.0.0",
+    server.WithInstructions(`You have access to a filesystem server with these tools:
+
+## Editing (IMPORTANT)
+- edit_file: Modify specific text (search/replace). ALWAYS prefer over write_file for existing files.
+- write_file: Create new files or full rewrites only.
+
+## Reading
+- read_file: Read contents. Use outline=true to get symbol index with line numbers.
+...
+
+## Key rules
+1. To modify existing files: use edit_file, NOT write_file
+2. To explore large files: use read_file with outline=true first`),
+)
+```
+
+### Go implementation (official Go SDK)
+
+```go
+srv, _ := server.NewMCPServer(server.ServerConfig{
+    Name:    "my-server",
+    Version: "1.0.0",
+    Instructions: "Your instruction text here...",
+})
+```
+
+### Spec compliance
+
+| Rule | Level |
+|------|-------|
+| `instructions` field is optional in `InitializeResult` | MAY |
+| If present, client SHOULD surface it to the AI model | SHOULD |
+| Content is free-form text (no schema) | — |
+
+### Review checklist for `instructions`
+
+- [ ] Server sets `instructions` with tool catalog and usage guidance
+- [ ] Instructions mention ALL tools, not just common ones
+- [ ] Critical rules are explicit (e.g., "prefer X over Y for this case")
+- [ ] Instructions are concise — models have context limits
+
+> ⚠️ **Common gap in Go MCP servers**: Most Go servers built with `mcp-go` do NOT set `WithInstructions()`, leaving the model to discover tools on its own. This is the #1 cause of the model ignoring available tools. Always set instructions.
 
 ---
 

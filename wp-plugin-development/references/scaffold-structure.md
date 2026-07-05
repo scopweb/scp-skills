@@ -4,21 +4,42 @@ Estructura de archivos y main file para cualquier tipo de plugin.
 
 ---
 
-## Estructura de directorios
+## Cuándo usar este scaffold (sin Composer)
+
+Usar esta estructura **sin Composer** cuando:
+- Plugin simple (< 5 archivos PHP)
+- Sin dependencias de librerías externas
+- Testing básico o sin tests
+- Solo para uso interno/cliente
+
+Usar estructura **con Composer/PSR-4** cuando:
+- Plugin complejo con múltiples clases
+- API externa con dependencias (Guzzle, etc.)
+- Testing serio (PHPUnit + WP_Mock)
+- PHPCS + PHPStan en CI
+- Varios desarrolladores
+
+Ver: [php-modern-patterns.md](../wp-plugin-audit/references/php-modern-patterns.md) en wp-plugin-audit para la estructura con Composer.
+
+---
+
+## Estructura de directorios (sin Composer)
 
 ```
 plugin-slug/
-├── plugin-slug.php          ← Main file (header + bootstrap)
+├── plugin-slug.php              ← Main file (header + bootstrap)
+├── uninstall.php                ← Cleanup al desinstalar
 ├── includes/
-│   ├── class-plugin-slug.php    ← Clase principal (singleton)
-│   ├── class-ps-activator.php   ← Lógica de activación
-│   └── class-ps-deactivator.php ← Lógica de desactivación
+│   ├── class-plugin-slug.php       ← Clase principal (singleton)
+│   ├── class-ps-activator.php      ← Lógica de activación
+│   ├── class-ps-deactivator.php    ← Lógica de desactivación
+│   └── class-ps-database.php       ← Helper DB (si hay tablas custom)
 ├── admin/
-│   ├── class-ps-admin.php       ← Admin pages y settings (si aplica)
+│   ├── class-ps-admin.php          ← Admin pages y settings
 │   └── partials/
-│       └── admin-display.php    ← HTML del admin panel
+│       └── admin-display.php       ← HTML del admin panel
 ├── public/
-│   ├── class-ps-public.php      ← Hooks frontend (si aplica)
+│   ├── class-ps-public.php         ← Hooks frontend (shortcodes, etc.)
 │   └── partials/
 ├── assets/
 │   ├── css/
@@ -27,6 +48,8 @@ plugin-slug/
 │   └── js/
 │       ├── admin.js
 │       └── public.js
+├── commands/                        ← WP_CLI commands (si aplica)
+│   └── class-ps-import-command.php
 └── languages/
     └── plugin-slug.pot
 ```
@@ -196,3 +219,74 @@ class MPC_Deactivator {
 - El prefijo `mpc_` / `MPC_` es un ejemplo — usar el prefijo del plugin real.
 - `flush_rewrite_rules()` solo en activación/desactivación, **nunca** en `init` normal.
 - Omitir carpetas/clases que no se usen (no generar código vacío innecesario).
+
+---
+
+## uninstall.php — Cleanup al desinstalar
+
+El archivo `uninstall.php` se ejecuta automáticamente cuando el usuario elimina el plugin desde el admin de WP. Debe limpiar todas las opciones, tablas y meta fields.
+
+```php
+<?php
+/**
+ * uninstall.php — Cleanup del plugin
+ *
+ * Se ejecuta automáticamente al desinstalar el plugin.
+ * NO requiere ABSPATH check (WP lo provee).
+ */
+
+// Si se desactiva (no elimina), no ejecutar cleanup
+if (!defined('WP_UNINSTALL_PLUGIN')) {
+    exit;
+}
+
+// Opciones
+delete_option('mpc_options');
+delete_option('mpc_version');
+delete_option('mpc_db_version');
+
+// Transients
+delete_transient('mpc_access_token');
+delete_transient('mpc_productos_cache');
+
+// Post meta
+global $wpdb;
+$wpdb->delete($wpdb->postmeta, ['meta_key' => '_mpc_precio']);
+$wpdb->delete($wpdb->postmeta, ['meta_key' => '_mpc_sku']);
+
+// Tablas custom
+$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}mpc_productos");
+$wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}mpc_pedidos");
+
+// Posts del CPT (si se quieren eliminar con el plugin)
+$posts = get_posts([
+    'post_type'      => 'mpc_producto',
+    'post_status'    => 'any',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+]);
+
+foreach ($posts as $post_id) {
+    wp_delete_post($post_id, true);
+}
+
+// Roles y capabilities (si se añadieron)
+remove_role('mpc_vendedor');
+remove_cap('manage_mpc_options');
+
+// Clear any cached data
+wp_cache_flush();
+```
+
+### Checklist antes de uninstall
+
+```
+□ Todas las options del plugin eliminadas
+□ Transients eliminados
+□ Post meta fields limpiados (_mpc_* etc.)
+□ Tablas custom eliminadas con DROP TABLE
+□ CPT posts eliminados o reasignados
+□ Roles/capabilities removidos
+□ wp_cache_flush() llamado
+□ NO incluir ABSPATH check (WP lo provee)
+```

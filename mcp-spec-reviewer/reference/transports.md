@@ -13,7 +13,7 @@ Two standard transports:
 
 Clients SHOULD support stdio whenever possible. Custom transports are also allowed.
 
-> ⚠️ **Roadmap 2026**: No se añadirán nuevos transports oficiales en este ciclo. El trabajo se centra en evolucionar Streamable HTTP para soportar escalado horizontal sin estado de sesión en servidor. Ver [nota de producción](#streamable-http-production-notes) abajo.
+> ⚠️ **Roadmap 2026**: No new official transports will be added in this cycle. Work focuses on evolving Streamable HTTP to support horizontal scaling without server-side session state. See [production notes](#streamable-http-production-notes) below.
 
 ---
 
@@ -156,14 +156,14 @@ When server initiates SSE stream in response to POST:
 
 ## Streamable HTTP — Production Notes
 
-> ℹ️ **Estado (marzo 2026)**: En producción a escala se han detectado problemas conocidos. La spec 2025-11-25 es válida, pero tener en cuenta al diseñar:
+> ℹ️ **Status (March 2026)**: Known issues have been identified at production scale. The 2025-11-25 spec is valid, but keep in mind when designing:
 
-| Problema | Impacto | Mitigación actual |
-|----------|---------|-------------------|
-| Sesiones stateful pelean con load balancers | El `MCP-Session-Id` vincula cliente a instancia de servidor | Sticky sessions / session affinity en LB |
-| Sin escalado horizontal nativo | Cada sesión requiere estado en servidor | Workarounds: Redis para estado compartido |
-| Sin mecanismo de discovery sin conectar | Registries/crawlers no pueden listar capacidades sin inicializar | Usar MCP Registry cuando disponible |
+| Problem | Impact | Current Mitigation |
+|---------|--------|-------------------|
+| Stateful sessions conflict with load balancers | `MCP-Session-Id` binds client to server instance | Sticky sessions / session affinity on LB |
+| No native horizontal scaling | Each session requires server-side state | Workarounds: Redis for shared state |
+| No discovery mechanism without connecting | Registries/crawlers cannot list capabilities without initializing | Use MCP Registry when available |
 
-**Roadmap**: El grupo de trabajo está diseñando un modelo de sesión stateless y un mecanismo de discovery de capacidades. Próximas versiones de spec abordarán estos gaps.
+**Roadmap**: The working group is designing a stateless session model and a capability discovery mechanism. Future spec versions will address these gaps.
 
-**Recomendación para servidores de producción**: Si el servidor va a desplegarse detrás de un LB, diseñar con sticky sessions habilitadas o implementar estado de sesión en capa compartida (Redis/DB) desde el principio.
+**Recommendation for production servers**: If the server will be deployed behind a load balancer, design with sticky sessions enabled or implement session state in a shared layer (Redis/DB) from the start.

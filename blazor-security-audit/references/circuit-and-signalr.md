@@ -79,6 +79,16 @@ builder.Services.AddSignalR(options =>
 });
 ```
 
+### MessagePack hub protocol (CVE-2026-45591)
+
+Runtimes < 10.0.9 sufren un stack overflow (DoS) al deserializar arrays MessagePack
+profundamente anidados en el hub protocol de SignalR. Checks de auditoría:
+
+- **Runtime ≥ 10.0.9** — obligatorio si algún hub usa `AddMessagePackProtocol()`.
+- Audita la versión de `Microsoft.AspNetCore.SignalR.Protocols.MessagePack` si se referencia explícitamente.
+- El circuito de Blazor Server usa su propio protocolo binario, pero los hubs SignalR adicionales de la app sí pueden negociar MessagePack.
+- `MaximumReceiveMessageSize` NO mitiga este CVE: la anidación profunda cabe en pocos bytes.
+
 ### Disable CORS for SignalR hub (if not needed)
 
 ```csharp
@@ -240,10 +250,10 @@ When a client reconnects to a Blazor Server app:
 - **Token expiration**: Check that expired tokens force re-authentication
 - **Circuit reuse**: A disconnected circuit retains its state — if a user logs out on another tab, the old circuit may still have the previous auth state until revalidation runs
 
-### Stateful reconnect (.NET 10)
+### Stateful reconnect (disponible desde .NET 8) y Azure SignalR
 
 ```csharp
-// Azure SignalR Service with stateful reconnect
+// Azure SignalR Service: sticky mode requerido para Blazor Server
 builder.Services.AddSignalR()
     .AddAzureSignalR(options =>
     {

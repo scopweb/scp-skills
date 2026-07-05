@@ -35,6 +35,18 @@ public static class OrderExtensions
 }
 ```
 
+> **Container rule:** an `extension` block lives inside a `static class` (like classic extension methods). The block declares the receiver; the enclosing static class is what the compiler indexes:
+>
+> ```csharp
+> public static class OrderExtensions
+> {
+>     extension(IEnumerable<Order> orders)
+>     {
+>         public decimal TotalAmount => orders.Sum(o => o.Amount);
+>     }
+> }
+> ```
+
 ---
 
 ## `field` Keyword

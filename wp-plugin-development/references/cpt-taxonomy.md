@@ -182,3 +182,74 @@ $metabox->register();
 - `show_in_rest => true` es obligatorio para compatibilidad con Gutenberg.
 - `flush_rewrite_rules()` solo en `register_activation_hook`, nunca en `init`.
 - Si el CPT necesita capabilities propias: `'capability_type' => array('producto','productos')` + `'map_meta_cap' => true`.
+
+---
+
+## Block Templates para CPT (Gutenberg)
+
+WP 6.4+ permite definir templates de bloques para CPT, bloqueando o guiando el contenido.
+
+### Definir template en register_post_type
+
+```php
+$args = array(
+    // ... otros args
+    'template' => array(
+        array('core/heading', array(
+            'placeholder' => 'Nombre del producto',
+            'level'       => 2,
+        )),
+        array('core/image', array(
+            'placeholder' => 'Añadir imagen del producto',
+        )),
+        array('core/paragraph', array(
+            'placeholder' => 'Descripción del producto...',
+        )),
+    ),
+    'template_lock' => 'insert', // 'insert' = permite agregar, 'all' = bloqueado
+);
+```
+
+### Bloques de ACF PRO en template
+
+```php
+// Si usas ACF PRO con blocks
+'template' => array(
+    array('acf/mpc-producto-datos', array(
+        'data' => array(
+            'mpc_precio' => '',
+        ),
+    )),
+),
+```
+
+### Block bindings con meta fields (WP 6.5+)
+
+Para bindear un meta field a un bloque de forma declarativa, registrar el meta con `show_in_rest`:
+
+```php
+register_post_meta('mpc_producto', '_mpc_precio', [
+    'type'         => 'number',
+    'single'       => true,
+    'show_in_rest' => true,
+]);
+```
+
+Luego en el bloque:
+```json
+{
+    "attributes": {
+        "price": {
+            "type": "number",
+            "source": "binding",
+            "binding": {
+                "price": {
+                    "type": "string",
+                    "source": "meta",
+                    "meta": "_mpc_precio"
+                }
+            }
+        }
+    }
+}
+```

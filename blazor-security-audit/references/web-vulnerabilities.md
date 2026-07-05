@@ -10,6 +10,7 @@
 6. [Input Validation](#input-validation)
 7. [SQL Injection](#sql-injection)
 8. [Open Redirect](#open-redirect)
+9. [Path Traversal, File Handling & IDOR](#path-traversal-file-handling--idor)
 
 ---
 
@@ -64,6 +65,17 @@ builder.Services.AddScoped<IHtmlSanitizer>(_ =>
     return sanitizer;
 });
 ```
+
+### Custom JS / wwwroot scripts (and MVC/Vue mixed apps)
+
+Blazor's auto-encoding does NOT protect HTML you build yourself in JS interop or `wwwroot` scripts. Audited holes: jQuery `.html(...)`, `el.innerHTML = ...`, Vue `v-html`, and `@Html.Raw(...)` in `.cshtml` — all fed server/DB data (a document named `<img src=x onerror=alert(1)>.pdf` executes on render).
+
+```js
+// ❌ el.innerHTML = data.nombre;      $(el).html(data.nombre);
+// ✅ el.textContent = data.nombre;    $(el).text(data.nombre);   // or an escapeHtml() helper
+```
+
+Treat any `@Html.Raw`, `(MarkupString)`, or `v-html` fed by editable data as XSS until proven sanitized.
 
 ### Audit commands
 
@@ -294,6 +306,34 @@ var orders = context.Orders
     .OrderBy(userProvidedSortColumn); // If using System.Linq.Dynamic
 ```
 
+### Raw ADO.NET / Dapper (no EF Core)
+
+Read-only legacy DBs hit via `SqlConnection`/`SqlCommand` or Dapper get **no** automatic parameterization. Real audit findings:
+
+```csharp
+// ❌ CRITICAL: IN-clause built by quoting + concatenating values.
+//    A value like   1', 0, (SELECT @@VERSION), '   breaks out of the quotes.
+string Build(IEnumerable<string> ids) => string.Join(",", ids.Select(v => $"'{v}'"));
+var sql = $"... WHERE NumCarga IN ({Build(cargas)})";          // NEVER
+
+// ✅ SAFE: real parameterized IN — one parameter per value, typed to the column.
+var names = cargas.Select((_, i) => $"@c{i}").ToArray();
+cmd.CommandText = $"... WHERE NumCarga IN ({string.Join(",", names)})";
+for (int i = 0; i < cargas.Count; i++)
+    cmd.Parameters.Add($"@c{i}", SqlDbType.VarChar).Value = cargas[i];   // VARCHAR col → VarChar, not Int
+
+// ❌ CRITICAL: building SQL by token replacement — worst when the template is loaded from the DB.
+sql = queryTemplate.Replace("@ids", string.Join(",", ids));     // NEVER
+
+// ❌ HIGH: interpolating an identifier (table / db / column) from config or input.
+cmd.CommandText = $"SELECT * FROM [{databaseName}].dbo.Pedidos"; // a ']' in the value breaks escaping
+// ✅ Validate identifiers against a whitelist first:
+if (databaseName is not ("JJP_CRM" or "JJP_CRM_TEST"))
+    throw new InvalidOperationException("BD no permitida");
+```
+
+If the project already has a correctly-parameterized helper, reuse it instead of inventing a new query path.
+
 ### Audit commands
 
 ```bash
@@ -325,4 +365,64 @@ if (Url.IsLocalUrl(returnUrl))
     NavigationManager.NavigateTo(returnUrl);
 else
     NavigationManager.NavigateTo("/");
+```
+
+**SSRF (OWASP A01:2025)**: si el servidor descarga o consume una URL proporcionada por el
+usuario (`HttpClient.GetAsync(userUrl)`), valida contra una allow-list de hosts y bloquea
+rangos internos (localhost, 10.x, 172.16-31.x, 192.168.x, 169.254.x). El Top 10:2025
+clasifica SSRF dentro de A01 Broken Access Control.
+
+---
+
+## Path Traversal, File Handling & IDOR
+
+File upload/download/list/delete endpoints are a top source of real findings — none of this is automatic.
+
+### Path traversal
+
+```csharp
+// ❌ CRITICAL: user-controlled name concatenated / Path.Combine'd into a path
+var path = baseDir + fileName;                  // NEVER
+var path = Path.Combine(baseDir, pedido, name); // NEVER when pedido/name come from input
+// A route param {fileName} doesn't capture '/' by default, but %2e%2e%2f (encoded ../)
+// and Windows backslashes still escape the folder.
+
+// ✅ SAFE: reduce each segment to a bare file name, then confirm containment.
+var safeName = Path.GetFileName(fileName);
+var full = Path.GetFullPath(Path.Combine(baseDir, safeName));
+if (!full.StartsWith(Path.GetFullPath(baseDir) + Path.DirectorySeparatorChar,
+        StringComparison.Ordinal))
+    return Results.BadRequest(); // escaped the base directory
+```
+
+### Extracción de archivos (tar/zip) — CVE-2026-45491
+
+`TarFile.ExtractToDirectory` en runtimes < 10.0.9 permite symlink traversal: un tar
+malicioso escribe fuera del directorio destino. Si la app extrae archivos subidos:
+runtime **≥ 10.0.9** obligatorio, extraer a un directorio dedicado y verificar la ruta
+resuelta de cada entrada antes de escribir (mismo patrón de containment de arriba).
+
+### IDOR (insecure direct object reference)
+
+`[Authorize]` proves *who* the user is, not that they own the resource. An authenticated user passing someone else's `pedido=12345` must be rejected.
+
+```csharp
+// ✅ Verify the current user may act on THIS resource before reading/writing/deleting it.
+if (!await _svc.UserOwnsPedidoAsync(currentUserId, pedidoId, ct))
+    return Results.Forbid();
+```
+
+### Upload size limits
+
+```csharp
+builder.Services.Configure<FormOptions>(o =>
+    o.MultipartBodyLengthLimit = 30 * 1024 * 1024); // 30 MB; also KestrelServerOptions.Limits.MaxRequestBodySize
+```
+Base64/JSON uploads bypass multipart limits — cap request body size too.
+
+### Audit commands
+
+```bash
+grep -rn "Path.Combine\|Path.GetFullPath\|FileStream\|File.Open\|File.ReadAll" --include="*.cs" .
+grep -rn "MultipartBodyLengthLimit\|MaxRequestBodySize" --include="*.cs" .
 ```

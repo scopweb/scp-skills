@@ -1,7 +1,7 @@
 ---
 name: blazor-dotnet10
 description: >
-  Best practices para Blazor Server .NET 10.0.8 (SDK 10.0.300), C# 14, EF Core y SQL Server.
+  Best practices para Blazor Server .NET 10.0.9 (SDK 10.0.301), C# 14, EF Core y SQL Server.
   Usar cuando: trabajar en componentes Blazor Server, acceso a datos con EF Core,
   arquitectura de servicios, o proyectos .NET 10. Diferente de razor-dotnet10 — este skill
   cubre el modelo de circuito Blazor Server, no HTTP request/response.
@@ -13,20 +13,35 @@ license: MIT
 
 # Blazor Server .NET 10 & C# 14 — Best Practices
 
-**.NET 10.0.8** (LTS, Nov 2025) with **SDK 10.0.300** and **C# 14**.
+**.NET 10.0.9** (LTS — .NET 10 GA Nov 2025; current patch Jun 2026) with **SDK 10.0.301** and **C# 14**.
 Focused on **Blazor Server** (not Minimal APIs/MVC).
 
 ## Versions
 
 | Component | Version |
 |-----------|---------|
-| .NET Runtime | 10.0.8 |
-| .NET SDK | 10.0.300 |
+| .NET Runtime | 10.0.9 |
+| .NET SDK | 10.0.301 |
 | C# | 14 |
 | TargetFramework | `net10.0` |
 | LangVersion | `14` |
 
-> SDK 10.0.300 is the banded SDK that ships 10.0.8 — pin your `global.json` to it for reproducible builds.
+> SDK 10.0.301 is the banded SDK that ships 10.0.9 — pin your `global.json` to it for reproducible builds.
+>
+> **10.0.9 is a security patch (Jun 2026)** — stay on the latest 10.0.x. The Data Protection regression **CVE-2026-40372** affected 10.0.0–10.0.6 (fixed in 10.0.7), so 10.0.9 is in the clear. For the full security-audit checklist, use the **`blazor-security-audit`** skill.
+
+## What's New in .NET 10 (Blazor Server)
+
+The deltas most relevant to a Blazor Server app:
+
+- **`blazor.web.js` is now a fingerprinted static web asset** with Brotli/Gzip precompression (~76% smaller: ~183 KB → ~43 KB) → faster first load and better caching. Use `app.MapStaticAssets()` (not `UseStaticFiles()`) so the fingerprinted pipeline activates.
+- **State persistence across reconnects** — `[PersistentState]` plus `Blazor.pause()` / `Blazor.resume()` let a user resume after a dropped circuit instead of losing in-progress work.
+- **`ReconnectModal`** — a customizable, CSP-compliant "connection lost" UI with reconnection-state hooks, replacing the old inline reconnect UI.
+- **QuickGrid `RowClass`** (conditional row styling) and **`HideColumnOptionsAsync()`** — see [quickgrid.md](references/quickgrid.md).
+- **`NotFound()` routing** — first-class 404 handling instead of manual workarounds.
+- **Nested/complex form validation** is now first-class in `EditForm`.
+- **Direct JS property access** — `JS.GetValueAsync<T>(...)` / `JS.SetValueAsync(...)` read/write JS object properties without wrapper functions.
+- **Passkeys / WebAuthn** scaffolded by the Blazor Web App template (passwordless) → hardening lives in **`blazor-security-audit`**.
 
 ## Reference Files
 
@@ -52,12 +67,12 @@ Read the relevant reference file before implementing. For quick patterns, use th
 
 ### Pin SDK with `global.json`
 
-Place at repo root to lock the SDK to **10.0.300** for reproducible builds:
+Place at repo root to lock the SDK to **10.0.301** for reproducible builds:
 
 ```json
 {
   "sdk": {
-    "version": "10.0.300",
+    "version": "10.0.301",
     "rollForward": "latestFeature"
   }
 }
@@ -94,8 +109,8 @@ Place at repo root to apply consistent settings across every project in the solu
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Optional: pin runtime to 10.0.8 for self-contained/published apps -->
-    <RuntimeFrameworkVersion>10.0.8</RuntimeFrameworkVersion>
+    <!-- Optional: pin runtime to 10.0.9 for self-contained/published apps -->
+    <RuntimeFrameworkVersion>10.0.9</RuntimeFrameworkVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -120,7 +135,7 @@ Place at repo root to apply consistent settings across every project in the solu
 </Project>
 ```
 
-> `TargetFramework` stays `net10.0` (a floating major). `RuntimeFrameworkVersion` is what pins the **runtime** patch to `10.0.8`; `global.json` pins the **SDK** band to `10.0.300`. Use both when reproducibility matters.
+> `TargetFramework` stays `net10.0` (a floating major). `RuntimeFrameworkVersion` is what pins the **runtime** patch to `10.0.9`; `global.json` pins the **SDK** band to `10.0.301`. Use both when reproducibility matters.
 >
 > For full modern structure (`.slnx`, `Directory.Build.props`, central package management via `Directory.Packages.props`, SourceLink, RELEASE_NOTES.md), see the `dotnet-project-structure` skill.
 

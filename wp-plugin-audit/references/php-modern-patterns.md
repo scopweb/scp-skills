@@ -1,7 +1,7 @@
 # PHP Moderno en Plugins WordPress
 
 Patrones PHP 8.x con namespaces, PSR-4 y Composer para plugins privados/cliente.
-Compatible con WordPress 6.x (PHP 7.4+ requerido, 8.1+ recomendado).
+Compatible con WordPress 6.4+ (PHP 8.1+ mínimo, 8.2+ recomendado para 2026).
 
 ---
 
@@ -45,14 +45,16 @@ my-plugin/
     "description": "Plugin privado para ClientName",
     "type": "wordpress-plugin",
     "require": {
-        "php": ">=8.1"
+        "php": ">=8.2"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.0",
+        "phpunit/phpunit": "^10.5",
         "10up/wp_mock": "^1.0",
-        "squizlabs/php_codesniffer": "^3.7",
-        "wp-coding-standards/wpcs": "^3.0",
-        "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+        "squizlabs/php_codesniffer": "^3.8",
+        "wp-coding-standards/wpcs": "^3.1",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpstan/phpstan": "^1.10",
+        "phpstan/extension-installer": "^1.3"
     },
     "autoload": {
         "psr-4": {
@@ -67,7 +69,8 @@ my-plugin/
     "scripts": {
         "test": "phpunit",
         "lint": "phpcs",
-        "lint-fix": "phpcbf"
+        "lint-fix": "phpcbf",
+        "phpstan": "phpstan analyse"
     }
 }
 ```
@@ -87,8 +90,8 @@ my-plugin/
  * License:     Proprietary
  * Text Domain: my-plugin
  * Domain Path: /languages
- * Requires at least: 6.0
- * Requires PHP: 8.1
+ * Requires at least: 6.4
+ * Requires PHP: 8.2
  */
 
 if (!defined('ABSPATH')) {

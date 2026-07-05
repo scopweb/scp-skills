@@ -1,5 +1,7 @@
 # Authentication & Authorization — Reference
 
+> **Security note (Jun 2026):** cookie auth, antiforgery and TempData are all protected by ASP.NET Core **Data Protection**. **CVE-2026-40372** (Microsoft.AspNetCore.DataProtection 10.0.0–10.0.6 computed the HMAC over the wrong bytes) undermines those guarantees — **require runtime 10.0.9+** everywhere this reference is applied. The 10.0.9 patch also fixes the ASP.NET Core DoS issues CVE-2026-42899 / CVE-2026-45591.
+
 ## Two-Scheme Setup (Cookie + JWT)
 
 The most common pattern: Cookie auth for Razor Pages UI, JWT Bearer for API endpoints.
@@ -158,23 +160,28 @@ public class LogoutModel(SignInManager<AppUser> signInManager) : PageModel
 
 ## JWT Token Generation & Refresh
 
+> Use **`JsonWebTokenHandler`** (`Microsoft.IdentityModel.JsonWebTokens`) — it's what JwtBearer uses for validation since .NET 8 and is faster and allocation-friendlier than the legacy `JwtSecurityTokenHandler`. Avoid `JwtSecurityToken`/`JwtSecurityTokenHandler` in new code.
+
 ```csharp
-public sealed class TokenService(IConfiguration config)
+public sealed class TokenService(IConfiguration config, TimeProvider clock)
 {
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromHours(2);
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(7);
 
     public string GenerateAccessToken(AppUser user, IList<string> roles)
     {
-        var claims = BuildClaims(user, roles);
-        var key = GetSigningKey();
-        var token = new JwtSecurityToken(
-            issuer: config["Jwt:Issuer"],
-            audience: config["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.Add(AccessTokenLifetime),
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var now = clock.GetUtcNow().UtcDateTime;
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = config["Jwt:Issuer"],
+            Audience = config["Jwt:Audience"],
+            Subject = new ClaimsIdentity(BuildClaims(user, roles)),
+            IssuedAt = now,
+            Expires = now.Add(AccessTokenLifetime),
+            SigningCredentials = new SigningCredentials(
+                GetSigningKey(), SecurityAlgorithms.HmacSha256)
+        };
+        return new JsonWebTokenHandler().CreateToken(descriptor);
     }
 
     public string GenerateRefreshToken()
@@ -191,9 +198,6 @@ public sealed class TokenService(IConfiguration config)
             new(ClaimTypes.Email, user.Email!),
             new(ClaimTypes.Name, user.FullName ?? user.Email!),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(JwtRegisteredClaimNames.Iat,
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(),
-                ClaimValueTypes.Integer64),
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         return claims;
@@ -204,6 +208,8 @@ public sealed class TokenService(IConfiguration config)
             ?? throw new InvalidOperationException("Jwt:Key not configured")));
 }
 ```
+
+> Store refresh tokens **hashed** server-side (like passwords) and rotate them on every use. HS256 keys must be ≥ 32 bytes (256 bits).
 
 ## Reading Claims in Controllers & Pages
 
@@ -271,3 +277,20 @@ static async Task SeedRolesAsync(IServiceProvider services)
     }
 }
 ```
+
+## Passkeys / WebAuthn (Identity en .NET 10)
+
+Identity expone `IdentityPasskey<TUser>` desde .NET 10 — login passwordless con Windows Hello, iCloud Keychain, YubiKey, etc.
+
+```csharp
+// Program.cs — habilitar passkeys
+builder.Services.AddIdentity<AppUser, IdentityRole>()
+    .AddEntityFrameworkStores<AppIdentityDbContext>()
+    .AddDefaultTokenProviders()
+    .AddPasskeyStore<AppUser>(); // .NET 10+
+
+// Opcional: AAGUID inference para nombres amigables (Windows Hello, etc.)
+// .NET 11 añadirá inferencia automática — en 10 hay que mapear manualmente.
+```
+
+> El scaffolding de UI para passkeys requiere el template **Blazor Web App** o el **Individual Accounts** actualizado. Para auditoria profunda (origen, replay, attestation), usa **`blazor-security-audit`** — aplica también a Razor/MVC.

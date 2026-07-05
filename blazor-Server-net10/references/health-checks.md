@@ -103,6 +103,39 @@ public sealed class HybridCacheHealthCheck(HybridCache cache) : IHealthCheck
 .AddCheck<HybridCacheHealthCheck>("hybrid-cache", tags: new[] { "ready" });
 ```
 
+### Dapper connection-factory check
+
+`AddSqlServer` pings a raw connection string. If your reads go through the DI-registered `IDbConnectionFactory<SqlConnection>` (the Dapper path in this skill), check *that* so the probe exercises the real code path:
+
+```csharp
+public sealed class SqlConnectionHealthCheck(
+    IDbConnectionFactory<SqlConnection> factory) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var conn = await factory.CreateConnectionAsync(ct);
+            var ok = await conn.ExecuteScalarAsync<int>(
+                new CommandDefinition("SELECT 1;", cancellationToken: ct));
+            return ok == 1
+                ? HealthCheckResult.Healthy("SQL connection factory OK")
+                : HealthCheckResult.Unhealthy("SELECT 1 returned an unexpected value");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy("SQL connection factory failed", ex);
+        }
+    }
+}
+
+// Registration
+.AddCheck<SqlConnectionHealthCheck>("sql-factory", tags: new[] { "ready", "db" });
+```
+
+> Don't pair this with `AddSqlServer` on the *same* connection unless you want both — they overlap. Pick the one that matches your real read path (this skill leans Dapper, so the factory check is the truer signal).
+
 ---
 
 ## Custom Response Writer

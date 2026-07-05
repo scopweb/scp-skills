@@ -201,6 +201,8 @@ The `IdentityRevalidatingAuthenticationStateProvider` revalidates the security s
 
 ## Common Vulnerabilities
 
+Corresponden principalmente a **OWASP Top 10:2025** A07 (Authentication Failures) y A01 (Broken Access Control).
+
 | Vulnerability | Impact | Detection |
 |--------------|--------|-----------|
 | Missing `[Authorize]` on pages | Unauthorized access | Search for `@page` without `[Authorize]` |

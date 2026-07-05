@@ -10,11 +10,13 @@ Setup y patrones para plugins privados. Enfoque en tests rápidos con WP_Mock
 ```bash
 # Instalar dependencias de dev
 composer require --dev \
-    phpunit/phpunit:^10.0 \
+    phpunit/phpunit:^10.5 \
     10up/wp_mock:^1.0 \
-    squizlabs/php_codesniffer:^3.7 \
-    wp-coding-standards/wpcs:^3.0 \
-    dealerdirect/phpcodesniffer-composer-installer:^1.0
+    squizlabs/php_codesniffer:^3.8 \
+    wp-coding-standards/wpcs:^3.1 \
+    dealerdirect/phpcodesniffer-composer-installer:^1.0 \
+    phpstan/phpstan:^1.10 \
+    vimeo/psalm:^5.0
 
 # Verificar que WPCS se registró
 ./vendor/bin/phpcs -i | grep WordPress
@@ -32,6 +34,7 @@ composer require --dev \
     bootstrap="tests/bootstrap.php"
     colors="true"
     testdox="true"
+    cacheDirectory=".phpunit.cache"
 >
     <testsuites>
         <testsuite name="Unit">
@@ -46,6 +49,7 @@ composer require --dev \
     <coverage>
         <report>
             <html outputDirectory="coverage"/>
+            <text outputFile="coverage.txt"/>
         </report>
     </coverage>
 </phpunit>
@@ -266,10 +270,11 @@ class ProductCPTTest extends PluginTestCase {
     <!-- Excluir vendor y tests de algunos sniffs -->
     <exclude-pattern>vendor/*</exclude-pattern>
     <exclude-pattern>tests/*</exclude-pattern>
+    <exclude-pattern>.phpunit.cache/*</exclude-pattern>
 
     <!-- PHP mínimo -->
-    <config name="minimum_supported_wp_version" value="6.0"/>
-    <config name="testVersion" value="8.1-"/>
+    <config name="minimum_supported_wp_version" value="6.4"/>
+    <config name="testVersion" value="8.2-"/>
 
     <!-- Reglas base -->
     <rule ref="WordPress-Extra">
@@ -320,7 +325,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.3'
           tools: composer
       - run: composer install --no-interaction
       - run: composer lint
@@ -340,11 +345,58 @@ jobs:
           coverage: xdebug
       - run: composer install --no-interaction
       - run: composer test -- --coverage-text
+
+  phpstan:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+      - run: composer install --no-interaction
+      - run: composer phpstan
 ```
 
 ---
 
-## 9. Comandos de uso frecuente
+## 9. PHPStan — Static Analysis
+
+PHPStan complementa PHPCS buscando errores lógicos y de tipado, no solo estilo.
+
+### phpstan.neon.dist
+
+```yaml
+parameters:
+    level: 5
+    paths:
+        - src
+        - my-plugin.php
+    excludePaths:
+        - vendor
+    ignoreErrors:
+        - '#Call to function wp_remote_get\(\) with unsupported value#'
+    treatPhpDocTypesAsCertain: false
+
+includes:
+    - vendor/phpstan/phpstan-wordpress/extension.neon
+```
+
+### Ejecutar
+
+```bash
+# PHPCS + PHPStan
+composer lint
+composer phpstan
+
+# Auto-fix lo que pueda (solo PHPCS)
+composer lint-fix
+```
+
+---
+
+## 10. Comandos de uso frecuente
 
 ```bash
 # Ejecutar tests
@@ -364,6 +416,9 @@ composer lint-fix
 
 # PHPCS sobre un archivo concreto
 ./vendor/bin/phpcs src/Admin/SettingsPage.php
+
+# PHPStan — análisis estático
+composer phpstan
 
 # Ver cobertura (requiere Xdebug)
 ./vendor/bin/phpunit --coverage-html coverage/

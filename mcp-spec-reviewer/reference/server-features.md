@@ -40,6 +40,9 @@ Servers with tools MUST declare:
     "destructiveHint": false,
     "idempotentHint": true,
     "openWorldHint": false
+  },
+  "execution": {
+    "taskSupport": "optional"
   }
 }
 ```
@@ -83,6 +86,16 @@ Clients MUST consider annotations **untrusted** unless from a trusted server.
 | `destructiveHint` | bool | Tool may cause irreversible changes |
 | `idempotentHint` | bool | Safe to call multiple times with same args |
 | `openWorldHint` | bool | Tool interacts with external entities |
+
+### Tool Execution Properties
+
+Tools may include an `execution` field:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `taskSupport` | string | `"forbidden"` (default), `"optional"`, or `"required"` — controls task-augmented invocation |
+
+See [utilities.md](./utilities.md#tool-level-task-negotiation) for task negotiation details.
 
 ### Tool Result
 
@@ -172,6 +185,13 @@ Servers SHOULD prefer non-https schemes when client needs to read via MCP server
 
 - **Text**: `{ "uri": "...", "mimeType": "...", "text": "content" }`
 - **Binary**: `{ "uri": "...", "mimeType": "...", "blob": "base64..." }`
+
+### Resource Definition Fields
+
+In addition to `uri`, `name`, `title`, `mimeType`, and `annotations`, resources may include:
+
+- `description`: Optional description
+- `size`: Optional size in bytes
 
 ---
 

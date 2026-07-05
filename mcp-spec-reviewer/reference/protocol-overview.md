@@ -15,7 +15,7 @@ MCP uses **JSON-RPC 2.0** over stateful connections between three roles:
 
 A host application can run multiple clients, each connected to a different server.
 
-> ℹ️ **Gobernanza (dic 2025)**: MCP fue donado a la **Agentic AI Foundation (AAIF)**, fondo dirigido bajo la Linux Foundation, co-fundado por Anthropic, Block y OpenAI. El proyecto ya no es exclusivamente de Anthropic. El repositorio oficial sigue en https://github.com/modelcontextprotocol.
+> ℹ️ **Governance (Dec 2025)**: MCP was donated to the **Agentic AI Foundation (AAIF)**, a directed fund under the Linux Foundation, co-founded by Anthropic, Block, and OpenAI. The project is no longer exclusively Anthropic's. The official repository remains at https://github.com/modelcontextprotocol.
 
 ---
 
@@ -34,6 +34,7 @@ All messages MUST be UTF-8 encoded JSON-RPC 2.0.
 ```
 - ID MUST be string or integer
 - ID MUST NOT be null (differs from base JSON-RPC)
+- ID MUST NOT have been previously used by the requestor within the same session
 
 ### Responses (success)
 ```json
@@ -98,11 +99,26 @@ Icon object:
 }
 ```
 
-- `src`: URI to icon (REQUIRED) — can be https://, data: URI, or other
+- `src`: URI to icon (REQUIRED) — MUST be HTTPS or `data:` URI
 - `mimeType`: MIME type hint (OPTIONAL)
 - `sizes`: Array of size strings like "48x48" or "any" (OPTIONAL)
+- `theme`: Optional theme preference (`light` or `dark`)
 
-Security: consumers MAY disallow specific file types, SHOULD validate MIME via magic bytes.
+### Required MIME type support
+
+Clients rendering icons **MUST** support: `image/png`, `image/jpeg`
+Clients rendering icons **SHOULD** also support: `image/svg+xml`, `image/webp`
+
+### Icon Security (CRITICAL)
+
+- Clients **MUST** reject icon URIs with unsafe schemes (`javascript:`, `file:`, `ftp:`, `ws:`, local app URIs)
+- Clients **MUST** disallow scheme changes and redirects to different origins
+- Clients **MUST** fetch icons without credentials (no cookies, no `Authorization` headers)
+- Clients **SHOULD** verify icon URIs are from the same origin as the server
+- Consumers **MAY** set limits for image/content size (resource exhaustion defense)
+- Consumers **MAY** disallow specific file types or sanitize before rendering
+- Validate MIME types via magic bytes; reject on mismatch or unknown types
+- Maintain a strict allowlist of image types
 
 ---
 
