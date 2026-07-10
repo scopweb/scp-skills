@@ -239,7 +239,9 @@ builder.Services.AddRazorComponents()
 
 3. **Large payloads**: Avoid sending large data through SignalR. Stream or paginate.
 
-4. **Concurrent access**: A circuit processes events sequentially, but service calls can overlap if the user clicks fast. Use `SemaphoreSlim` for critical sections:
+4. **MessagePack hub protocol** (custom hubs): if you add your own SignalR hubs with `AddMessagePackProtocol()`, note **CVE-2026-45591** — a stack-overflow DoS via deeply nested MessagePack arrays, fixed in .NET **10.0.9**. Stay on the patched runtime/packages; the default Blazor Server circuit protocol is not MessagePack, so plain Blazor apps are only affected through custom hubs.
+
+5. **Concurrent access**: A circuit processes events sequentially, but service calls can overlap if the user clicks fast. Use `SemaphoreSlim` for critical sections:
 ```csharp
 private readonly SemaphoreSlim _semaphore = new(1, 1);
 

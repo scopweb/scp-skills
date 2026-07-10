@@ -5,6 +5,8 @@
 **Target**: Blazor Server .NET 10.0.8 (LTS), SDK 10.0.300, C# 14, EF Core + Dapper, SQL Server  
 **Reviewer**: Grok (via deep file reads, cross-skill comparison, env verification with exact SDK/runtime, compilation experiments, web searches for official confirmation)
 
+> **Addendum (Jul 2026)**: the skill has since been updated to **.NET 10.0.9 / SDK 10.0.301** (Jun 2026 servicing band) and now documents the June 2026 CVEs relevant to Blazor Server (**CVE-2026-45591** SignalR MessagePack DoS, **CVE-2026-40372** DataProtection HMAC, **CVE-2026-45490** dotnet.exe workload EoP) plus the EF Core 10 highlights (named query filters, SQL Server 2025 JSON/VECTOR). Version references below to 10.0.8 / SDK 10.0.300 reflect the state at the time of this review and are kept for traceability. The P0 fixes listed at the end were applied; the QuickGrid `RowClass` gap (P1 #7) has also been addressed.
+
 ## Executive Summary
 
 This is a **high-quality, specialized, production-oriented skill** focused exclusively on the unique challenges of **Blazor Server** (long-lived SignalR circuits, state, concurrency, prerender handoff) on the precise .NET 10.0.8 band. It correctly differentiates itself from the sibling `razor-dotnet10` skill (HTTP request/response model).

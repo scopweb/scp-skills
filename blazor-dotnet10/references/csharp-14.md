@@ -5,19 +5,22 @@
 Replace traditional static extension methods with cleaner syntax:
 
 ```csharp
-// ✅ C# 14 extension block
-extension(IEnumerable<Order> orders)
+// ✅ C# 14 extension blocks (inside a static class — see container rule below)
+public static class CollectionExtensions
 {
-    public decimal TotalAmount => orders.Sum(o => o.Amount);
-    public bool HasPending => orders.Any(o => o.Status == OrderStatus.Pending);
-    public IEnumerable<Order> Active() => orders.Where(o => !o.IsDeleted);
-}
+    extension(IEnumerable<Order> orders)
+    {
+        public decimal TotalAmount => orders.Sum(o => o.Amount);
+        public bool HasPending => orders.Any(o => o.Status == OrderStatus.Pending);
+        public IEnumerable<Order> Active() => orders.Where(o => !o.IsDeleted);
+    }
 
-// ✅ Generic extension block
-extension<T>(IEnumerable<T> source)
-{
-    public bool IsEmpty => !source.Any();
-    public T? FirstOrNull() where T : struct => source.Any() ? source.First() : null;
+    // ✅ Generic extension block
+    extension<T>(IEnumerable<T> source)
+    {
+        public bool IsEmpty => !source.Any();
+        public T? FirstOrNull() where T : struct => source.Any() ? source.First() : null;
+    }
 }
 
 // Usage reads naturally

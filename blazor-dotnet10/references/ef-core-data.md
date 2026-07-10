@@ -120,6 +120,45 @@ var page = await ctx.Orders
 
 ---
 
+## EF Core 10 Highlights
+
+EF Core 10 ships alongside .NET 10 (EF Core 11 is expected Nov 2026). The most useful additions for this stack:
+
+### Named query filters (multiple filters per entity)
+
+```csharp
+// ✅ Two independent global filters on the same entity
+modelBuilder.Entity<Order>()
+    .HasQueryFilter("SoftDelete", o => !o.IsDeleted)
+    .HasQueryFilter("Tenant", o => o.TenantId == tenantProvider.TenantId);
+
+// ✅ Disable only one filter for a specific query
+var includingDeleted = await ctx.Orders
+    .IgnoreQueryFilters(["SoftDelete"])   // tenant filter still applies
+    .AsNoTracking()
+    .ToListAsync(ct);
+```
+
+> Before EF Core 10 an entity could only have **one** query filter and `IgnoreQueryFilters()` was all-or-nothing — a common source of tenant-leak bugs.
+
+### SQL Server 2025 JSON columns
+
+```csharp
+// ✅ Map to the native `json` column type (SQL Server 2025)
+modelBuilder.Entity<Order>()
+    .OwnsOne(o => o.Metadata, b => b.ToJson());   // stored/queried as JSON
+```
+
+### SQL Server 2025 VECTOR columns
+
+EF Core 10 supports the SQL Server 2025 `VECTOR` type (via `Microsoft.Data.SqlClient`'s `SqlVector`) for similarity search — map the column type explicitly and use `EF.Functions.VectorDistance(...)` in LINQ.
+
+### LINQ improvements
+
+General translation improvements — as always, verify generated SQL for hot paths with `.ToQueryString()` / logging.
+
+---
+
 ## SQL Server Specifics
 
 ### Raw SQL when EF falls short

@@ -28,7 +28,12 @@ Focused on **Blazor Server** (not Minimal APIs/MVC).
 
 > SDK 10.0.301 is the banded SDK that ships 10.0.9 — pin your `global.json` to it for reproducible builds.
 >
-> **10.0.9 is a security patch (Jun 2026)** — stay on the latest 10.0.x. The Data Protection regression **CVE-2026-40372** affected 10.0.0–10.0.6 (fixed in 10.0.7), so 10.0.9 is in the clear. For the full security-audit checklist, use the **`blazor-security-audit`** skill.
+> **10.0.9 is a security patch (Jun 2026)** — stay on the latest 10.0.x. Relevant fixes:
+> - **CVE-2026-45591** — DoS (stack overflow) via deeply nested MessagePack arrays in the SignalR MessagePack hub protocol. Relevant if your app adds custom SignalR hubs with `AddMessagePackProtocol()`. Fixed in 10.0.9.
+> - **CVE-2026-40372** — `Microsoft.AspNetCore.DataProtection` 10.0.0–10.0.6: the managed authenticated encryptor computed the HMAC over the wrong bytes. Update packages/runtime to 10.0.9.
+> - **CVE-2026-45490** — EoP via a weak-ACL named pipe in the `dotnet.exe` workload (Windows). Use SDK 10.0.301+.
+>
+> For the full security-audit checklist, use the **`blazor-security-audit`** skill.
 
 ## What's New in .NET 10 (Blazor Server)
 
@@ -42,6 +47,7 @@ The deltas most relevant to a Blazor Server app:
 - **Nested/complex form validation** is now first-class in `EditForm`.
 - **Direct JS property access** — `JS.GetValueAsync<T>(...)` / `JS.SetValueAsync(...)` read/write JS object properties without wrapper functions.
 - **Passkeys / WebAuthn** scaffolded by the Blazor Web App template (passwordless) → hardening lives in **`blazor-security-audit`**.
+- **EF Core 10** (ships alongside .NET 10; EF Core 11 expected Nov 2026): SQL Server 2025 **JSON columns** and **VECTOR** support, **named query filters** (multiple filters per entity, selectively disableable), and LINQ translation improvements — see [ef-core-data.md](references/ef-core-data.md).
 
 ## Reference Files
 
@@ -73,10 +79,12 @@ Place at repo root to lock the SDK to **10.0.301** for reproducible builds:
 {
   "sdk": {
     "version": "10.0.301",
-    "rollForward": "latestFeature"
+    "rollForward": "latestPatch"
   }
 }
 ```
+
+> `latestPatch` stays within the 10.0.3xx band (picks up security patches, stays reproducible). `latestFeature` would silently jump to 10.0.4xx when installed — use it only if you *want* to float across feature bands.
 
 ### Shared MSBuild properties (`Directory.Build.props`)
 
@@ -129,6 +137,10 @@ Place at repo root to apply consistent settings across every project in the solu
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.*" />
     <!-- For non-HTTP pipelines (Dapper etc.) -->
     <PackageReference Include="Microsoft.Extensions.Resilience" Version="10.*" />
+
+    <!-- Health checks (SQL Server probe + EF DbContext check) -->
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.*" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.*" />
 
     <!-- QuickGrid is built-in with Microsoft.AspNetCore.Components.QuickGrid (no extra package) -->
   </ItemGroup>
@@ -340,11 +352,14 @@ public string Name
     set => field = value?.Trim() ?? string.Empty;
 }
 
-// Extension blocks
-extension(IEnumerable<Order> orders)
+// Extension blocks — must live inside a static class
+public static class OrderExtensions
 {
-    public decimal TotalAmount => orders.Sum(o => o.Amount);
-    public bool HasPending => orders.Any(o => o.Status == OrderStatus.Pending);
+    extension(IEnumerable<Order> orders)
+    {
+        public decimal TotalAmount => orders.Sum(o => o.Amount);
+        public bool HasPending => orders.Any(o => o.Status == OrderStatus.Pending);
+    }
 }
 
 // Null-conditional assignment

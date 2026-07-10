@@ -464,8 +464,8 @@ public sealed class HybridOrderService(
 7. **Connection pooling is built-in** — `SqlConnection` reuses physical connections
 
 ```csharp
-// Streaming huge result sets
-var stream = await conn.QueryUnbufferedAsyncAsync<BigRow>(
+// Streaming huge result sets — QueryUnbufferedAsync returns IAsyncEnumerable<T> (no await here)
+var stream = conn.QueryUnbufferedAsync<BigRow>(
     new CommandDefinition("SELECT * FROM dbo.HugeTable", cancellationToken: ct));
 
 await foreach (var row in stream.WithCancellation(ct))

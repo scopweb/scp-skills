@@ -48,12 +48,12 @@ Tags are how you separate liveness from readiness:
 
 | Check | Package |
 |-------|---------|
-| `AddSqlServer` | `Microsoft.Extensions.Diagnostics.HealthChecks.SqlServer` |
+| `AddSqlServer` | `AspNetCore.HealthChecks.SqlServer` |
 | `AddDbContextCheck<T>` | `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` |
 | `AddRedis` | `AspNetCore.HealthChecks.Redis` |
 | `AddUrlGroup` | `AspNetCore.HealthChecks.Uris` (HTTP ping) |
-| `AddDiskStorageHealthCheck` | disk space |
-| `AddProcessAllocatedMemoryHealthCheck` | memory |
+| `AddDiskStorageHealthCheck` | `AspNetCore.HealthChecks.System` (disk space) |
+| `AddProcessAllocatedMemoryHealthCheck` | `AspNetCore.HealthChecks.System` (memory) |
 | `AddApplicationInsightsPublisher` | emits results to App Insights |
 | `AddSignalRHub` | SignalR hub health |
 
